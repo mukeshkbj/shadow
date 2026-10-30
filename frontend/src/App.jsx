@@ -262,7 +262,7 @@ function Review({ id }) {
 
         <section className="col-side card flush" aria-label="Playbook">
           <div role="tablist" aria-label="Playbook views" className="tabs">
-            {[["steps", "Steps"], ["flow", "Flow"], ["questions", `Open questions · ${c.open_questions}`]].map(([k, l]) => (
+            {[["steps", "Steps"], ["flow", "Flow"], ["questions", `Open questions · ${c.open_questions}`], ["replay", "Replay"]].map(([k, l]) => (
               <button key={k} role="tab" aria-selected={tab === k} className={`tab ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>{l}</button>
             ))}
           </div>
@@ -283,6 +283,7 @@ function Review({ id }) {
           )}
           {tab === "flow" && <Flow pb={pb} onPick={(sid) => { const i = steps.findIndex(s => s.id === sid); if (i >= 0) { pick(i); setTab("steps"); } }} />}
           {tab === "questions" && <Questions pb={pb} onAnswer={(qid, a) => update(api.answer(id, qid, a))} />}
+          {tab === "replay" && <Replay id={id} steps={steps} />}
           {pb.notes?.length > 0 && tab === "steps" && (
             <details className="notes small"><summary>Evidence check log ({pb.notes.length})</summary><ul>{pb.notes.map((n, i) => <li key={i}>{n}</li>)}</ul></details>
           )}
@@ -368,6 +369,55 @@ function Question({ q, onAnswer }) {
           <input id={`a-${q.id}`} className="input grow" placeholder="Type an answer" value={val} onChange={e => setVal(e.target.value)} />
           <button className="btn btn-accent" type="submit">Save answer</button>
         </form>
+      )}
+    </div>
+  );
+}
+
+function Replay({ id, steps }) {
+  const [log, setLog] = useState(undefined);
+  useEffect(() => { setLog(undefined); api.replay(id).then(setLog).catch(() => setLog(null)); }, [id]);
+  if (log === undefined) return <div className="pad muted">Loading…</div>;
+  if (!log) return (
+    <div className="pad stack-xs muted">
+      <strong>No replay for this job yet.</strong>
+      <span>After confirming the playbook, run <code>python scripts/replay.py {id}</code>. The agent re-runs it in the app it came from, and stops to ask at anything unconfirmed or unshown.</span>
+    </div>
+  );
+  const indexOf = Object.fromEntries(steps.map((s, i) => [s.id, i + 1]));
+  return (
+    <div className="pad stack-md">
+      {log.stopped && <div className="notice small">Stopped: {log.stopped}</div>}
+      {log.actions.map((x, i) => {
+        const shot = indexOf[x.step] ? api.replayShotUrl(id, `step_${String(indexOf[x.step]).padStart(2, "0")}.png`) : null;
+        return (
+          <div key={i} className="stack-xs" style={{ borderBottom: "1px solid var(--line)", paddingBottom: 12 }}>
+            <div className="row" style={{ gap: 10, alignItems: "baseline" }}>
+              <span className="mono xsmall muted">{x.step}</span>
+              <span className="grow">
+                {x.decision ? <>Decision — {x.decision} → <b>{x.chose}</b></>
+                  : x.skipped ? <span className="muted"><s>{x.text}</s> skipped</span>
+                  : <b>{x.text}</b>}
+                {(x.error || x.why) && <span className="muted small"> — {x.error || x.why}</span>}
+              </span>
+              <span className={`pill ${x.ok === false ? "pill-error" : x.skipped ? "" : "pill-done"}`}>
+                {x.skipped ? "skipped" : x.decision ? "decision" : x.ok === false ? "failed" : "done"}
+              </span>
+            </div>
+            {x.action && !["none", "check"].includes(x.action) &&
+              <span className="mono xsmall muted">{x.action} {x.selector}{x.value ? ` = ${x.value}` : ""}</span>}
+            {shot && <img src={shot} alt="" onError={e => e.currentTarget.remove()}
+                          style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid var(--line)" }} />}
+          </div>
+        );
+      })}
+      {log.asked?.length > 0 && (
+        <div className="stack-xs">
+          <strong className="small">Asked the expert</strong>
+          {log.asked.map((a, i) => (
+            <div key={i} className="small muted"><span className="accent">?</span> {a.question} → {a.answer || "(stopped here)"}</div>
+          ))}
+        </div>
       )}
     </div>
   );

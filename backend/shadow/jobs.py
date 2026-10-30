@@ -71,6 +71,16 @@ class JobStore:
         p = self.dir(job_id) / "video.mp4"
         return p if p.exists() else None
 
+    def replay(self, job_id: str) -> Optional[dict]:
+        p = self.dir(job_id) / "replay_log.json"
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+    def replay_shot(self, job_id: str, name: str) -> Optional[Path]:
+        if not name.startswith("step_") or not name.endswith(".png") or "/" in name or "\\" in name:
+            return None
+        p = self.dir(job_id) / "replay" / name
+        return p if p.exists() else None
+
     # ---------- sample job (works with no API key and no recording) ----------
     def ensure_sample(self) -> None:
         d = self.root / "sample"

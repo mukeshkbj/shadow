@@ -42,3 +42,14 @@ def test_upload_size_cap_removes_job_dir(tmp_path):
     with pytest.raises(ValueError):
         store.create("big.mp4", io.BytesIO(b"x" * 2_000_000))
     assert all(d.name == "sample" for d in (tmp_path / "jobs").iterdir())
+
+
+def test_replay_endpoints():
+    d = api_mod.store.dir("sample")
+    (d / "replay").mkdir(exist_ok=True)
+    (d / "replay_log.json").write_text('{"title":"t","actions":[],"asked":[],"stopped":""}', encoding="utf-8")
+    (d / "replay" / "step_01.png").write_bytes(b"\x89PNG")
+    assert c.get("/api/jobs/sample/replay").status_code == 200
+    assert c.get("/api/jobs/sample/replay/shots/step_01.png").status_code == 200
+    assert c.get("/api/jobs/sample/replay/shots/..status.json").status_code == 404
+    assert c.get("/api/jobs/sample/replay/shots/status.json").status_code == 404

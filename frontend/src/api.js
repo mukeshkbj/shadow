@@ -19,6 +19,8 @@ export const api = {
   answer: (id, qid, answer) => req(`/api/jobs/${id}/questions/${qid}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer }) }),
   exportMd: (id) => req(`/api/jobs/${id}/export.md`),
   exportMmd: (id) => req(`/api/jobs/${id}/export.mmd`),
+  replay: (id) => req(`/api/jobs/${id}/replay`),
+  replayShotUrl: (id, name) => `/api/jobs/${id}/replay/shots/${name}`,
   videoUrl: (id) => `/api/jobs/${id}/video`,
 };
 

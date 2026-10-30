@@ -129,6 +129,28 @@ def export_mermaid(job_id: str):
     return exporters.mermaid(_pb(job_id))
 
 
+@app.get("/api/jobs/{job_id}/replay")
+def get_replay(job_id: str):
+    try:
+        log = store.replay(job_id)
+    except KeyError:
+        log = None
+    if log is None:
+        raise HTTPException(404, "no replay for this job")
+    return log
+
+
+@app.get("/api/jobs/{job_id}/replay/shots/{name}")
+def replay_shot(job_id: str, name: str):
+    try:
+        p = store.replay_shot(job_id, name)
+    except KeyError:
+        p = None
+    if p is None:
+        raise HTTPException(404, "no such replay screenshot")
+    return FileResponse(p, media_type="image/png")
+
+
 @app.get("/api/jobs/{job_id}/video")
 def video(job_id: str):
     try:
