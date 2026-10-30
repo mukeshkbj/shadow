@@ -1,0 +1,32 @@
+{
+  "title": "Processing a refund request",
+  "steps": [
+    {"id": "s1", "t_start": 12, "t_end": 38, "text": "Open the next request in the refunds inbox", "detail": "Screen sorted newest first; narration says oldest first", "kind": "step", "source": "inferred",
+     "evidence": "Seen: inbox sorted newest first and the newest request opened. Heard: “I always take the oldest one first.” These disagree, so the handling order needs confirming.", "evidence_event_ids": ["e1", "e2", "e3"], "field": "Refunds inbox"},
+    {"id": "s2", "t_start": 41, "t_end": 70, "text": "Look up the order by its number", "detail": "Order number from the email, typed into Orders search", "kind": "step", "source": "seen",
+     "evidence": "Seen: ORD-10421 typed into the order search and Search clicked.", "evidence_event_ids": ["e5", "e6"], "field": "Order number"},
+    {"id": "s3", "t_start": 78, "t_end": 110, "text": "Check it was bought within the last 30 days", "detail": "Older than 30 days → store credit only", "kind": "decision", "source": "said",
+     "evidence": "Heard while pointing at the purchase date. The 30-day limit isn't shown on screen.", "quote": "If it's more than thirty days old we can only do store credit.", "evidence_event_ids": ["e7", "e8"], "field": "Purchase date"},
+    {"id": "s4", "t_start": 125, "t_end": 150, "text": "Check the refund isn't more than the order total", "detail": "Refund amount compared with order total", "kind": "step", "source": "said",
+     "evidence": "Cursor moved between Order total and Refund amount.", "quote": "Make sure they're not asking for more than they paid.", "evidence_event_ids": ["e9"], "field": "Refund amount"},
+    {"id": "s5", "t_start": 160, "t_end": 195, "text": "Over £500? Get manager approval first", "detail": "Approver chosen before issuing", "kind": "decision", "source": "said",
+     "evidence": "Heard while opening the Approver list; the £500 threshold isn't shown on screen.", "quote": "Anything over five hundred pounds I send to my manager first, before I touch the payment.", "evidence_event_ids": ["e10", "e11", "e12"], "field": "Approver"},
+    {"id": "s6", "t_start": 202, "t_end": 230, "text": "Issue the refund", "detail": "Refund goes back to the original card", "kind": "step", "source": "seen",
+     "evidence": "Seen: Issue refund clicked; confirmation banner shown.", "evidence_event_ids": ["e13", "e14"], "field": "Issue refund"},
+    {"id": "s7", "t_start": 250, "t_end": 272, "text": "Email the customer a confirmation", "detail": "Use the “Refund confirmed” template", "kind": "step", "source": "seen",
+     "evidence": "Seen: “Refund confirmed” template chosen and the email sent.", "evidence_event_ids": ["e15", "e17"], "field": "Template"}
+  ],
+  "decisions": [
+    {"id": "d1", "step_id": "s3", "question": "Bought within 30 days?", "branches": [
+      {"label": "Yes", "next_step_id": "s4", "source": "said", "t": 80},
+      {"label": "No: store credit only", "open_question_id": "q1", "source": "said", "t": 80}]},
+    {"id": "d2", "step_id": "s5", "question": "Over £500?", "branches": [
+      {"label": "Yes: manager approves first", "next_step_id": "s6", "source": "said", "t": 162},
+      {"label": "No", "next_step_id": "s6", "source": "inferred"}]}
+  ],
+  "open_questions": [
+    {"id": "q1", "question": "What happens if the customer refuses store credit?", "why": "The store-credit branch at 01:20 ends there; no next step was shown.", "related_t": 80},
+    {"id": "q2", "question": "Who approves refunds over £500 when the manager is away?", "why": "Approval was mentioned at 02:42 but no backup was named.", "related_t": 162},
+    {"id": "q3", "question": "How is a partial refund handled?", "why": "In this recording the refund amount matched the order total.", "related_t": 125}
+  ]
+}

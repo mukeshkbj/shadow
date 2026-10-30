@@ -1,0 +1,177 @@
+{
+  "duration": 272,
+  "transcript": "(sample) I'm in the refunds inbox. I always take the oldest one first. ... Anything over five hundred pounds I send to my manager first, before I touch the payment. ...",
+  "events": [
+    {
+      "id": "e1",
+      "t": 12,
+      "source": "seen",
+      "action": "Opens the refunds inbox, sorted newest first",
+      "screen": "Refunds inbox",
+      "field": "Newest first"
+    },
+    {
+      "id": "e2",
+      "t": 14,
+      "source": "said",
+      "action": "States handling order",
+      "screen": "Refunds inbox",
+      "quote": "I always take the oldest one first."
+    },
+    {
+      "id": "e3",
+      "t": 20,
+      "source": "seen",
+      "action": "Opens the request from Alex Morgan (the newest)",
+      "screen": "Refunds inbox",
+      "field": "Alex Morgan"
+    },
+    {
+      "id": "e4",
+      "t": 30,
+      "source": "said",
+      "action": "Summarises the email",
+      "screen": "Email",
+      "quote": "Customer says the lamp arrived broken, order ten-four-two-one."
+    },
+    {
+      "id": "e5",
+      "t": 41,
+      "source": "seen",
+      "action": "Types ORD-10421 into order search",
+      "screen": "Orders",
+      "field": "Order number"
+    },
+    {
+      "id": "e6",
+      "t": 50,
+      "source": "seen",
+      "action": "Clicks Search; order details appear",
+      "screen": "Orders",
+      "field": "Search"
+    },
+    {
+      "id": "e7",
+      "t": 78,
+      "source": "seen",
+      "action": "Points at the purchase date",
+      "screen": "Order",
+      "field": "Purchase date"
+    },
+    {
+      "id": "e8",
+      "t": 80,
+      "source": "said",
+      "action": "States the 30-day rule",
+      "screen": "Order",
+      "field": "Purchase date",
+      "quote": "If it's more than thirty days old we can only do store credit. This one's fine, it's from the twelfth."
+    },
+    {
+      "id": "e9",
+      "t": 125,
+      "t_end": 148,
+      "source": "seen",
+      "action": "Moves the cursor between Order total and Refund amount",
+      "screen": "Order",
+      "field": "Refund amount"
+    },
+    {
+      "id": "e10",
+      "t": 160,
+      "source": "seen",
+      "action": "Opens the Approver list",
+      "screen": "Order",
+      "field": "Approver"
+    },
+    {
+      "id": "e11",
+      "t": 162,
+      "source": "said",
+      "action": "States the approval rule",
+      "screen": "Order",
+      "field": "Approver",
+      "quote": "Anything over five hundred pounds I send to my manager first, before I touch the payment."
+    },
+    {
+      "id": "e12",
+      "t": 170,
+      "source": "seen",
+      "action": "Selects Sam K. (team manager)",
+      "screen": "Order",
+      "field": "Approver"
+    },
+    {
+      "id": "e13",
+      "t": 202,
+      "source": "seen",
+      "action": "Clicks Issue refund; confirmation banner appears",
+      "screen": "Order",
+      "field": "Issue refund"
+    },
+    {
+      "id": "e14",
+      "t": 205,
+      "source": "said",
+      "action": "Explains timing",
+      "screen": "Order",
+      "quote": "That goes back on their card in three to five days."
+    },
+    {
+      "id": "e15",
+      "t": 250,
+      "source": "seen",
+      "action": "Chooses the Refund confirmed template",
+      "screen": "Email the customer",
+      "field": "Template"
+    },
+    {
+      "id": "e16",
+      "t": 251,
+      "source": "said",
+      "action": "Introduces the email",
+      "screen": "Email the customer",
+      "quote": "Last thing, the confirmation email."
+    },
+    {
+      "id": "e17",
+      "t": 262,
+      "source": "seen",
+      "action": "Clicks Send",
+      "screen": "Email the customer",
+      "field": "Send"
+    }
+  ],
+  "turns": [
+    {
+      "start": 11.5,
+      "end": 16.0,
+      "text": "I'm in the refunds inbox. I always take the oldest one first."
+    },
+    {
+      "start": 28.8,
+      "end": 33.4,
+      "text": "Customer says the lamp arrived broken, order ten four two one."
+    },
+    {
+      "start": 79.2,
+      "end": 86.5,
+      "text": "If it's more than thirty days old we can only do store credit. This one's fine, it's from the twelfth."
+    },
+    {
+      "start": 161.0,
+      "end": 167.8,
+      "text": "Anything over five hundred pounds I send to my manager first, before I touch the payment."
+    },
+    {
+      "start": 204.1,
+      "end": 207.3,
+      "text": "That goes back on their card in three to five days."
+    },
+    {
+      "start": 250.2,
+      "end": 252.4,
+      "text": "Last thing, the confirmation email."
+    }
+  ]
+}

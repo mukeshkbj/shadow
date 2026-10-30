@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Example Shop · Refunds desk</title>
+<style>
+  :root { --ink:#1b1f27; --muted:#5f6673; --line:#dfe3e8; --bg:#f5f6f8; --brand:#2f5d50; --warn:#a14a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:var(--brand); color:#fff; padding:12px 24px; display:flex; align-items:center; gap:24px; }
+  header b { font-size:18px; } header nav { display:flex; gap:18px; opacity:.9; }
+  .wrap { display:grid; grid-template-columns: 340px 1fr; min-height: calc(100vh - 50px); }
+  aside { background:#fff; border-right:1px solid var(--line); }
+  aside h2 { font-size:14px; margin:0; padding:14px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  aside select { font: inherit; font-size:13px; }
+  .msg { padding:12px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .msg:hover, .msg.active { background:#eef4f1; }
+  .msg small { color:var(--muted); display:block; }
+  main { padding:24px 32px; display:flex; flex-direction:column; gap:20px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:20px; }
+  .card h3 { margin:0 0 12px; font-size:16px; }
+  .email { white-space:pre-line; color:#333; }
+  .search { display:flex; gap:8px; }
+  input, select, textarea { font:inherit; padding:8px 10px; border:1px solid #c8ced6; border-radius:5px; background:#fff; }
+  .grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px 24px; }
+  label { display:flex; flex-direction:column; gap:4px; color:var(--muted); font-size:13px; }
+  label input, label select { color:var(--ink); font-size:15px; }
+  button { font:inherit; padding:9px 16px; border-radius:5px; border:1px solid #c8ced6; background:#fff; cursor:pointer; }
+  button.primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .actions { display:flex; gap:10px; margin-top:16px; }
+  .banner { padding:12px 16px; border-radius:6px; background:#e6f4ec; color:#14532d; display:none; }
+  .banner.show { display:block; }
+  .hint { color:var(--muted); font-size:13px; }
+  .hidden { display:none; }
+  .policy { font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header><b>Example Shop</b><nav><span>Orders</span><span><u>Refunds desk</u></span><span>Customers</span><span>Email</span></nav><span style="margin-left:auto;font-size:13px">Signed in as Priya S. (demo)</span></header>
+<div class="wrap">
+  <aside>
+    <h2>Refunds inbox
+      <select id="sort" aria-label="Sort inbox"><option value="new">Newest first</option><option value="old">Oldest first</option></select>
+    </h2>
+    <div id="inbox"></div>
+  </aside>
+  <main>
+    <div class="card" id="emailCard"><h3 id="emailSubject">Select a request</h3><div class="email" id="emailBody" style="color:var(--muted)">Pick a message from the refunds inbox.</div></div>
+
+    <div class="card">
+      <h3>Orders</h3>
+      <div class="search"><input id="q" placeholder="Order number, e.g. ORD-10421" size="28"><button id="find">Search</button></div>
+      <p class="hint" id="notFound"></p>
+    </div>
+
+    <div class="card hidden" id="orderCard">
+      <h3 id="orderTitle">Order</h3>
+      <div class="grid">
+        <label>Order number<input id="fNum" readonly></label>
+        <label>Purchase date<input id="fDate" readonly></label>
+        <label>Order total<input id="fTotal" readonly></label>
+        <label>Refund amount<input id="fRefund"></label>
+        <label>Reason<select id="fReason"><option>Damaged on arrival</option><option>Wrong item sent</option><option>No longer needed</option><option>Late delivery</option></select></label>
+        <label>Approver<select id="fApprover"><option value="">Select…</option><option>Sam K. (team manager)</option><option>Not needed</option></select></label>
+      </div>
+      <div class="actions">
+        <button class="primary" id="issue">Issue refund</button>
+        <button id="credit">Offer store credit</button>
+      </div>
+      <p class="policy">Payments go back to the original card.</p>
+    </div>
+
+    <div class="banner" id="banner"></div>
+
+    <div class="card hidden" id="composeCard">
+      <h3>Email the customer</h3>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label>To<input id="to" readonly></label>
+        <label>Template<select id="tpl"><option value="">Choose a template…</option><option value="ok">Refund confirmed</option><option value="credit">Store credit offered</option></select></label>
+        <textarea id="body" rows="7"></textarea>
+        <div><button class="primary" id="send">Send</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+// All data below is fictional, for demo recordings only.
+const requests = [
+  { id: 1, received: "2026-10-29 09:12", from: "alex.morgan@example.com", name: "Alex Morgan", order: "ORD-10421", subject: "Refund – lamp arrived broken",
+    body: "Hi,\nMy desk lamp arrived with the base cracked. Order ORD-10421. Could I get a refund please?\nThanks, Alex" },
+  { id: 2, received: "2026-10-28 14:40", from: "jo.patel@example.com", name: "Jo Patel", order: "ORD-10377", subject: "Returning a chair",
+    body: "Hello,\nThe chair from order ORD-10377 is not what I expected. I'd like my money back.\nJo" },
+  { id: 3, received: "2026-10-27 08:05", from: "chris.lee@example.com", name: "Chris Lee", order: "ORD-09980", subject: "Refund request – speaker",
+    body: "Hi there,\nI bought a speaker (ORD-09980) and it stopped working. Can I have a refund?\nChris" }
+];
+const orders = {
+  "ORD-10421": { date: "2026-10-12", total: 612.40, item: "Arc desk lamp (x2)" },
+  "ORD-10377": { date: "2026-10-20", total: 89.00, item: "Oak side chair" },
+  "ORD-09980": { date: "2026-08-30", total: 149.99, item: "Bluetooth speaker" }
+};
+const gbp = n => "£" + n.toFixed(2);
+let current = null, currentOrder = null;
+
+function renderInbox() {
+  const sort = document.getElementById("sort").value;
+  const list = [...requests].sort((a, b) => sort === "new" ? b.received.localeCompare(a.received) : a.received.localeCompare(b.received));
+  document.getElementById("inbox").innerHTML = list.map(r =>
+    `<div class="msg ${current && current.id === r.id ? "active" : ""}" data-id="${r.id}"><b>${r.name}</b><small>${r.subject}</small><small>${r.received}</small></div>`).join("");
+  document.querySelectorAll(".msg").forEach(el => el.onclick = () => openRequest(+el.dataset.id));
+}
+function openRequest(id) {
+  current = requests.find(r => r.id === id);
+  document.getElementById("emailSubject").textContent = current.subject;
+  const b = document.getElementById("emailBody"); b.textContent = current.body; b.style.color = "";
+  renderInbox();
+}
+function findOrder() {
+  const q = document.getElementById("q").value.trim().toUpperCase();
+  const o = orders[q];
+  document.getElementById("notFound").textContent = o ? "" : "No order found with that number.";
+  document.getElementById("orderCard").classList.toggle("hidden", !o);
+  if (!o) return;
+  currentOrder = { num: q, ...o };
+  document.getElementById("orderTitle").textContent = q + " · " + o.item;
+  document.getElementById("fNum").value = q;
+  document.getElementById("fDate").value = new Date(o.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  document.getElementById("fTotal").value = gbp(o.total);
+  document.getElementById("fRefund").value = gbp(o.total);
+  document.getElementById("fApprover").value = "";
+  document.getElementById("banner").className = "banner";
+}
+function showBanner(text) { const el = document.getElementById("banner"); el.textContent = text; el.className = "banner show"; }
+function openCompose(kind) {
+  document.getElementById("composeCard").classList.remove("hidden");
+  document.getElementById("to").value = current ? current.from : "";
+  document.getElementById("tpl").value = "";
+  document.getElementById("body").value = "";
+}
+document.getElementById("sort").onchange = renderInbox;
+document.getElementById("find").onclick = findOrder;
+document.getElementById("q").onkeydown = e => { if (e.key === "Enter") findOrder(); };
+document.getElementById("issue").onclick = () => {
+  if (!currentOrder) return;
+  showBanner(`Refund of ${document.getElementById("fRefund").value} issued for ${currentOrder.num}. It will reach the card in 3–5 working days.`);
+  openCompose("ok");
+};
+document.getElementById("credit").onclick = () => {
+  if (!currentOrder) return;
+  showBanner(`Store credit of ${document.getElementById("fRefund").value} offered for ${currentOrder.num}.`);
+  openCompose("credit");
+};
+document.getElementById("tpl").onchange = e => {
+  const name = current ? current.name.split(" ")[0] : "there";
+  const amt = document.getElementById("fRefund").value;
+  const t = {
+    ok: `Hi ${name},\n\nWe've issued a refund of ${amt} for order ${currentOrder ? currentOrder.num : ""}. It should reach your card in 3–5 working days.\n\nThanks,\nExample Shop`,
+    credit: `Hi ${name},\n\nYour order is outside our 30-day refund window, so we've added ${amt} store credit to your account.\n\nThanks,\nExample Shop`
+  }[e.target.value] || "";
+  document.getElementById("body").value = t;
+};
+document.getElementById("send").onclick = () => showBanner("Email sent to " + document.getElementById("to").value + ".");
+renderInbox();
+</script>
+</body>
+</html>
