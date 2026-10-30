@@ -56,6 +56,22 @@ Includes a full pipeline run against a fake Meta API with a generated video, whi
 ## Open-weights mode
 Pick **Open weights** on the upload screen to run both passes on **Muse Spark Open** through any OpenAI-compatible host (Baseten, Fireworks, Modal). Hosts ignore the audio inside a video, so each 30-second window is sent as a video part plus a separate WAV audio part.
 
+## Replay (stretch): the agent does the job back
+Once the expert has confirmed the playbook, Shadow can **re-run it** in the app it was recorded in.
+An agent loop shows Muse Spark the live page (screenshot + DOM snapshot) plus the rules the expert
+said aloud, and performs each step itself. It stops — rather than guesses — at any step still
+unconfirmed, and at any branch the recording never showed, and asks the expert before continuing.
+
+```powershell
+cd backend; .venv\Scripts\pip install playwright; .venv\Scripts\python -m playwright install chromium
+cd ..
+python scripts\replay.py <job_id>            # headed browser; answers prompts in the terminal
+python scripts\replay.py <job_id> --auto     # skip every unconfirmed/unshown stop (unattended)
+```
+
+Screenshots and `replay_log.json` land in the job's `replay/` folder. Playwright is an optional,
+local-only dependency — it is not in `requirements.txt` and not in the deployed app.
+
 ## Deploy (Modal)
 From PowerShell in this folder: `.\deploy.ps1` (set `$env:MODEL_API_KEY` first so uploads work live). It links your Modal account the first time, stores the settings as the `shadow-secrets` secret, builds the UI and deploys. Details are in `modal_app.py`.
 
@@ -68,10 +84,12 @@ All code in this repository was written during the hackathon building period (fr
 ## Project layout
 ```
 backend/shadow/   passes.py (Pass 1, 2) · evidence.py (Pass 3) · providers.py (Meta API / open weights)
-                  transcribe.py (Voice Transcribe) · pointer.py (SAM 3.1) · exporters.py · muse.py · api.py
+                  transcribe.py (Voice Transcribe) · pointer.py (SAM 3.1) · replay.py (agent re-run)
+                  exporters.py · muse.py · api.py
 modal_app.py      Modal deployment
 backend/fixtures/ sample timeline + draft playbook (offline sample)
 frontend/src/     review UI (React + Vite)
 demo-prop/        fictional refunds desk to record
 scripts/probe.py  timestamp gate test against the real API
+scripts/replay.py Replay: drives the demo prop through a confirmed playbook (Playwright + Muse)
 ```

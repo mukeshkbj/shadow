@@ -120,10 +120,10 @@ Won't (this hackathon): data model, checklist, JSON spec, merging recordings, li
 | 1 | Thu 29 Oct | ✅ Pipeline, evidence check, exporters, API, tests, demo prop, review UI. ✅ Baseten credits requested. To do: Meta/Modal/Fireworks accounts + credit forms; record take A; run `probe.py` (timestamp gate) |
 | 1b | Thu 29 Oct (late) | ✅ Built ahead: Voice Transcribe check of "Said" quotes, SAM 3.1 pointer, open-weights mode (Muse Spark Open, OpenAI-compatible), JSON retry, Modal deploy file. 14 tests pass |
 | 2a | Fri 30 Oct (am) | ✅ **Gate test passed** on a synthetic take with known timings: muse-spark-1.2 placed visible actions within ~1 s, narration verbatim, 10 s per call → single-call mode. Found spoken-line times drift up to ~9 s → said events now snap to Voice Transcribe turns. SAM can't read labels → pointer is now Spark locates + SAM refines (pixel-exact). Prompt tuned: 6 steps, decisions with branches, narration/screen conflict flagged |
-| 2 | Fri 30 Oct | Real run on take A; tune Pass 1/2 prompts; decide single-call vs 30 s windows. Public GitHub repo + first push. Watch the Fireworks session (12:00 ET) |
+| 2 | Fri 30 Oct | Real run on take A; tune Pass 1/2 prompts. ✅ Public repo live: github.com/mukeshkbj/shadow (2 commits). ✅ Upload caps added for the public URL (200 MB / 25 jobs). Watch the Fireworks session (12:00 ET) |
 | 3 | Sat 31 Oct | Tune transcript check + SAM noun phrases on real output; deploy to Modal (live URL) |
 | 4 | Sun 1 Nov | Run open-weights mode for real once Baseten/Fireworks/Modal credits arrive |
-| 5 | Mon 2 Nov | Record take B (shows it isn't hard-coded); polish UI; start the Replay stretch if ahead |
+| 5 | Mon 2 Nov | Record take B (shows it isn't hard-coded); polish UI. ✅ Replay built early (`shadow/replay.py` + `scripts/replay.py`): agent re-runs a confirmed playbook on the prop, stops at unconfirmed steps and unshown branches to ask. Needs `playwright install chromium` + a real take before a live run |
 | 6 | Tue 3 Nov | Hardening, cached results, README with "Built during the hackathon"; last day for technical help. Stretch: Replay agent |
 | 7 | Wed 4 Nov | 3-min demo video, submit by 20:00 GMT, post the X cut, share the gallery link |
 
