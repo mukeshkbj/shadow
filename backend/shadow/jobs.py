@@ -1,5 +1,6 @@
 """Job store on disk: data/jobs/<id>/{video.mp4, status.json, timeline.json, playbook.json}."""
 import json
+import shutil
 import threading
 import time
 import traceback
@@ -91,9 +92,18 @@ class JobStore:
         job_id = uuid.uuid4().hex[:12]
         d = self.dir(job_id)
         d.mkdir(parents=True)
-        with open(d / "video.mp4", "wb") as f:
-            while chunk := data_stream.read(1 << 20):
-                f.write(chunk)
+        limit = self.s.max_upload_mb * 1_000_000
+        size = 0
+        try:
+            with open(d / "video.mp4", "wb") as f:
+                while chunk := data_stream.read(1 << 20):
+                    size += len(chunk)
+                    if size > limit:
+                        raise ValueError(f"File exceeds the {self.s.max_upload_mb} MB upload limit.")
+                    f.write(chunk)
+        except Exception:
+            shutil.rmtree(d, ignore_errors=True)
+            raise
         self._set(job_id, id=job_id, filename=filename, provider=provider, stage="uploaded",
                   state="running", detail="", created=time.time())
         threading.Thread(target=self._run, args=(job_id, provider), daemon=True).start()

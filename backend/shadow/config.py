@@ -53,6 +53,10 @@ class Settings:
     use_transcribe: bool = field(default_factory=lambda: os.environ.get("SHADOW_TRANSCRIBE", "1") != "0")
     use_pointer: bool = field(default_factory=lambda: os.environ.get("SHADOW_POINTER", "1") != "0")
 
+    # Public deploy guards: the upload endpoint spends real API money.
+    max_upload_mb: int = field(default_factory=lambda: _int("SHADOW_MAX_UPLOAD_MB", 200))
+    max_jobs: int = field(default_factory=lambda: _int("SHADOW_MAX_JOBS", 25))
+
     @property
     def live(self) -> bool:
         return bool(self.api_key)

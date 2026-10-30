@@ -48,7 +48,14 @@ def create_job(file: UploadFile, provider: str = Form("muse")):
         raise HTTPException(400, "Please upload an MP4 (the Meta API accepts video/mp4 only).")
     if provider not in ("muse", "open"):
         raise HTTPException(400, "provider must be 'muse' or 'open'")
-    job_id = store.create(file.filename or "recording.mp4", file.file, provider)
+    if settings.max_upload_mb and file.size and file.size > settings.max_upload_mb * 1_000_000:
+        raise HTTPException(413, f"File exceeds the {settings.max_upload_mb} MB upload limit.")
+    if settings.max_jobs and len([j for j in store.list() if not j.get("sample")]) >= settings.max_jobs:
+        raise HTTPException(429, "This demo has reached its upload limit. The sample playbook is always available.")
+    try:
+        job_id = store.create(file.filename or "recording.mp4", file.file, provider)
+    except ValueError as e:
+        raise HTTPException(413, str(e))
     return {"id": job_id}
 
 
