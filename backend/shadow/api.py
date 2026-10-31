@@ -1,4 +1,5 @@
 """FastAPI app. Run: uvicorn shadow.api:app --reload  (from the backend folder)."""
+import hmac
 from pathlib import Path
 from typing import Optional
 
@@ -34,7 +35,8 @@ def health():
             "timeline_model": settings.timeline_model, "playbook_model": settings.playbook_model,
             "open_model": settings.open_model if settings.open_base_url else None,
             "window_seconds": settings.window_seconds,
-            "transcribe": settings.live and settings.use_transcribe, "pointer": settings.live and settings.use_pointer}
+            "transcribe": settings.live and settings.use_transcribe, "pointer": settings.live and settings.use_pointer,
+            "passcode_required": bool(settings.upload_passcode)}
 
 
 @app.get("/api/jobs")
@@ -43,7 +45,9 @@ def list_jobs():
 
 
 @app.post("/api/jobs")
-def create_job(file: UploadFile, provider: str = Form("muse")):
+def create_job(file: UploadFile, provider: str = Form("muse"), passcode: str = Form("")):
+    if settings.upload_passcode and not hmac.compare_digest(passcode.strip(), settings.upload_passcode):
+        raise HTTPException(403, "Wrong passcode. Uploads are limited because each one uses API credits; the sample playbooks are open to everyone.")
     if not (file.filename or "").lower().endswith(".mp4"):
         raise HTTPException(400, "Please upload an MP4 (the Meta API accepts video/mp4 only).")
     if provider not in ("muse", "open"):

@@ -14,7 +14,7 @@ export const api = {
   jobs: () => req("/api/jobs"),
   job: (id) => req(`/api/jobs/${id}`),
   playbook: (id) => req(`/api/jobs/${id}/playbook`),
-  upload: (file, provider = "muse") => { const f = new FormData(); f.append("file", file); f.append("provider", provider); return req("/api/jobs", { method: "POST", body: f }); },
+  upload: (file, provider = "muse", passcode = "") => { const f = new FormData(); f.append("file", file); f.append("provider", provider); f.append("passcode", passcode); return req("/api/jobs", { method: "POST", body: f }); },
   editStep: (id, sid, body) => req(`/api/jobs/${id}/steps/${sid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
   answer: (id, qid, answer) => req(`/api/jobs/${id}/questions/${qid}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer }) }),
   exportMd: (id) => req(`/api/jobs/${id}/export.md`),

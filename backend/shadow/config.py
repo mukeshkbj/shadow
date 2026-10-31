@@ -57,6 +57,9 @@ class Settings:
     max_upload_mb: int = field(default_factory=lambda: _int("SHADOW_MAX_UPLOAD_MB", 200))
     max_jobs: int = field(default_factory=lambda: _int("SHADOW_MAX_JOBS", 25))
 
+    # If set, uploading a recording (which spends API credits) needs this passcode. Viewing stays open.
+    upload_passcode: str = field(default_factory=lambda: os.environ.get("SHADOW_UPLOAD_PASSCODE", ""))
+
     @property
     def live(self) -> bool:
         return bool(self.api_key)

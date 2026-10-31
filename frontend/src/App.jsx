@@ -44,6 +44,7 @@ function Home() {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   const [provider, setProvider] = useState("muse");
+  const [passcode, setPasscode] = useState(() => { try { return localStorage.getItem("shadow-passcode") || ""; } catch { return ""; } });
   useEffect(() => {
     api.jobs().then(setJobs).catch(e => setErr(e.message));
     api.health().then(h => { setHealth(h); if (h.providers?.length && !h.providers.includes("muse")) setProvider(h.providers[0]); }).catch(() => {});
@@ -53,7 +54,12 @@ function Home() {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".mp4")) { setErr("Please choose an MP4 file."); return; }
     setBusy(true); setErr("");
-    try { const { id } = await api.upload(file, provider); go(`#/job/${id}/processing`); }
+    if (health?.passcode_required && !passcode.trim()) { setErr("Enter the upload passcode first."); return; }
+    try {
+      const { id } = await api.upload(file, provider, passcode);
+      try { localStorage.setItem("shadow-passcode", passcode); } catch {}
+      go(`#/job/${id}/processing`);
+    }
     catch (e) { setErr(e.message); setBusy(false); }
   };
 
@@ -86,6 +92,13 @@ function Home() {
              onDrop={e => { e.preventDefault(); setDrag(false); send(e.dataTransfer.files[0]); }}>
           <div className="drop-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C2410C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg></div>
           <div className="stack-xs center"><strong className="big">Drop a screen recording here</strong><span className="muted">MP4 with sound · one task, a few minutes long</span></div>
+          {health?.passcode_required && (
+            <div className="row center">
+              <label htmlFor="passcode" className="small muted">Upload passcode</label>
+              <input id="passcode" className="input" type="password" autoComplete="off" value={passcode}
+                     onChange={e => setPasscode(e.target.value)} placeholder="Needed to upload" />
+            </div>
+          )}
           <div className="row center">
             <label className="btn btn-dark">{busy ? "Uploading…" : "Choose a file"}
               <input type="file" accept="video/mp4" className="sr-only" disabled={busy} onChange={e => send(e.target.files[0])} />

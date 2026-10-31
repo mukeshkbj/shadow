@@ -53,3 +53,12 @@ def test_replay_endpoints():
     assert c.get("/api/jobs/sample/replay/shots/step_01.png").status_code == 200
     assert c.get("/api/jobs/sample/replay/shots/..status.json").status_code == 404
     assert c.get("/api/jobs/sample/replay/shots/status.json").status_code == 404
+
+
+def test_upload_needs_passcode_when_set(monkeypatch):
+    from dataclasses import replace
+    import shadow.api as api_mod
+    monkeypatch.setattr(api_mod, "settings", replace(api_mod.settings, upload_passcode="lamp-42"))
+    r = c.post("/api/jobs", files={"file": ("a.mp4", b"x", "video/mp4")}, data={"passcode": "nope"})
+    assert r.status_code == 403
+    assert c.get("/api/health").json()["passcode_required"] is True
