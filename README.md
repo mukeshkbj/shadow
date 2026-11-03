@@ -1,31 +1,44 @@
-# Shadow
+# Shadow — show it once
 
-**Shadow turns an expert's screen recording and narration into a reviewable playbook, with every step tied to its source and every assumption called out.**
+**Shadow turns an expert's screen recording and narration into a reviewable playbook, with every step tied to its source and every assumption called out. Then an agent does the job back, and stops to ask wherever the recording never showed it.**
 
-Built for the Meta Global AI Developer Hackathon (Indie track, *Build for Your World*).
+**Record → Verify → Replay.** Built for the Meta Global AI Developer Hackathon (Indie track, *Build for Your World*).
 
-**Live:** https://mukeshkbj--shadow-web.us-east.modal.run. The sample playbooks are open to everyone. Uploading a new recording needs a passcode, because each upload spends API credits.
+- **Live:** https://mukeshkbj--shadow-web.us-east.modal.run. Open the featured run (a real run on the Meta Model API). Uploading a new recording needs a passcode, because each upload spends API credits.
+- **Demo video (3 min):** see the submission page.
+
+![Every step cites its evidence](docs/evidence.jpg)
+
+## Why
+Every team has one person who knows how the job is really done. AI can write a procedure from a video now, but it fills the gaps with confident guesses, and a procedure you can't check is worse than none. Shadow's whole design is about **evidence and uncertainty**: what was seen, what was said, what Shadow is only inferring, and what nobody showed.
 
 ## What it does
-1. Someone records their screen while doing a task and talks as they go.
-2. **Muse Spark** watches the video *with* its audio and logs what was **seen** on screen and what was **said**, with timestamps.
-3. **Muse Wonder** drafts a step-by-step playbook from that log. Every step is labelled **Seen**, **Said** or **Inferred**, and branches nobody showed become **open questions**, not guesses.
-4. A deterministic **evidence check** (plain code, no AI) verifies every step against the log. A step with no evidence is removed and turned into a question. A "Said" step whose words weren't heard is downgraded to Inferred.
-   - **Muse Voice Transcribe** gives a second, independent check: a "Said" quote must appear in the narration turn spoken at that time. Spoken events also take their time from the transcript, because in testing Spark's times for spoken lines drifted by up to 9 s while screen actions were within about a second.
-   - **Muse Spark + SAM 3.1** make a visual pointer for the reviewer: SAM can't read text labels, so Spark finds the field by its label and SAM 3.1 outlines it precisely. It's a pointer, not proof.
-5. The expert reviews: click any step to jump to that moment in the video, confirm or fix inferred steps, answer open questions.
-6. Export a cited playbook (Markdown) and a flow diagram (Mermaid).
+1. **Record.** Someone records their screen while doing a task and talks as they go.
+2. **Muse Spark 1.2** watches the video *with* its audio and logs what was **seen** on screen and what was **said**, with timestamps.
+3. **Muse Voice Transcribe** times every spoken line. Spoken events take their time from the transcript (Spark's times for speech drift by seconds; see below), and every "Said" quote must appear in the narration turn spoken at that moment.
+4. **Muse Wonder** drafts the playbook from that log. Every step is labelled **Seen**, **Said** or **Inferred**; decisions get branches; branches nobody showed become **open questions**, not guesses.
+5. **Evidence check** (plain code, no AI) verifies every step against the log. No evidence: the step becomes a question. A "Said" quote that wasn't heard: downgraded to Inferred.
+6. **Muse Spark + SAM 3.1** draw a visual pointer for the reviewer: SAM can't read labels, so Spark finds the field by its label and SAM 3.1 outlines it. It helps you look; it is not proof.
+7. **Verify.** The expert reviews on one timeline (screen, voice, steps). Click any step and the video jumps to its moment. When screen and voice disagree, Shadow flags the step instead of choosing: in the demo she says "I always take the oldest one first" while the inbox is sorted *newest first*.
+8. **Replay.** **Muse Spark 1.3** drives the real app from the confirmed playbook, one action at a time, using only the rules the expert said aloud. It stops and asks at every unconfirmed step and every branch the recording never showed.
+9. Export a cited playbook (Markdown) and a flow diagram (Mermaid).
+
+| Screen and voice disagree → Shadow asks | Replay: the agent does the job back |
+|---|---|
+| ![conflict](docs/conflict.jpg) | ![replay](docs/replay.jpg) |
 
 ## Measured accuracy
-We scripted a recording of the demo app with known timings (`recordings/take-synthetic.ground_truth.json`) so timestamps could be scored, not eyeballed. Muse Spark 1.2, one call, 87-second clip:
+We scripted recordings of the demo app with known timings (`recordings/*.ground_truth.json`) so timestamps are scored, not eyeballed. Reproduce with `python scripts/score.py <job> recordings/<take>.ground_truth.json`.
 
-| What | Average error | Worst |
+| What | Featured run (85 s take) | Earlier take (87 s) |
 |---|---|---|
-| On-screen actions (6 clicks/typing) | **0.5 s** | 1 s |
-| Spoken lines, timed by Muse Spark | 6.4 s | 14.5 s |
-| Spoken lines, snapped to Muse Voice Transcribe turns | **0.3 s** | 0.5 s |
+| On-screen actions, Muse Spark 1.2 (avg / worst) | **0.5 s** / 1.0 s | **0.5 s** / 1 s |
+| Spoken lines, timed by Muse Spark (avg / worst) | 3.8 s / 9 s | 6.4 s / 14.5 s |
+| Spoken lines, snapped to Voice Transcribe turns (avg / worst) | **0.18 s** / 0.26 s | **0.3 s** / 0.5 s |
 
-That gap is why spoken events take their time from the transcript. One silent action (choosing an email template) was missed; Shadow doesn't invent it.
+That gap is why spoken events take their time from the transcript.
+
+**Known limits, stated plainly.** Muse Spark sometimes misreads small on-screen numbers: in one run it read £612.40 as £812.40. The evidence check verifies *that* something was seen or said, not every digit, which is why every step links to its moment in the video and the expert confirms. On the featured run, Replay completed all 8 steps (9 actions, 2 decisions) and asked the expert once, at the unconfirmed step.
 
 ## Run it (Windows)
 Needs Python 3.10+, Node 18+ and ffmpeg on PATH.
@@ -68,9 +81,9 @@ cd backend; python -m pytest -q
 Includes a full pipeline run against a fake Meta API with a generated video, which checks windowing, timestamp offsets and the evidence rules.
 
 ## Open-weights mode
-Pick **Open weights** on the upload screen to run both passes on **Muse Spark Open** through any OpenAI-compatible host (Baseten, Fireworks, Modal). Hosts ignore the audio inside a video, so each 30-second window is sent as a video part plus a separate WAV audio part.
+Pick **Open weights** on the upload screen to run both passes on **Muse Spark Open** through any OpenAI-compatible host (Baseten, Fireworks, Modal). Hosts ignore the audio inside a video, so each 30-second window is sent as a video part plus a separate WAV audio part. Status: built and covered by tests against a fake host, but not yet run against a live host.
 
-## Replay (stretch): the agent does the job back
+## Replay: the agent does the job back
 Once the expert has confirmed the playbook, Shadow can **re-run it** in the app it was recorded in.
 An agent loop shows Muse Spark the live page (screenshot + DOM snapshot) plus the rules the expert
 said aloud, and performs each step itself. It stops — rather than guesses — at any step still
@@ -106,4 +119,5 @@ frontend/src/     review UI (React + Vite)
 demo-prop/        fictional refunds desk to record
 scripts/probe.py  timestamp gate test against the real API
 scripts/replay.py Replay: drives the demo prop through a confirmed playbook (Playwright + Muse)
+scripts/score.py  scores a job's timestamps against a scripted take's ground truth
 ```

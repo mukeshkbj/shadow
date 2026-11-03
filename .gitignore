@@ -4,7 +4,8 @@ __pycache__/
 .pytest_cache/
 .venv/
 backend/data/
-recordings/
+recordings/*
+!recordings/*.ground_truth.json
 *.mp4
 *.timestamp-*.mjs
 .env

@@ -1,0 +1,20 @@
+{"say": [
+ [3.0, "I'm in the refunds inbox. I always take the oldest one first."],
+ [12.0, "Customer says the lamp arrived broken. Order ten four two one."],
+ [29.0, "If it's more than thirty days old, we can only do store credit. This one's fine, it's from the twelfth."],
+ [53.0, "Anything over five hundred pounds, I send to my manager first, before I touch the payment."],
+ [67.5, "That goes back on their card in three to five days."],
+ [73.0, "Last thing, the confirmation email."]
+],
+"act": [
+ [9.0, "click top inbox item (Alex Morgan, newest)"],
+ [20.0, "type ORD-10421 in order search"],
+ [23.0, "click Search"],
+ [27.0, "point at Purchase date"],
+ [40.0, "move between Order total and Refund amount (silent)"],
+ [52.0, "open Approver"],
+ [62.0, "select Sam K."],
+ [66.0, "click Issue refund"],
+ [75.5, "choose Refund confirmed template"],
+ [82.0, "click Send"]
+], "end": 87}
