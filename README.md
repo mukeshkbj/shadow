@@ -82,7 +82,7 @@ cd backend; python -m pytest -q
 Includes a full pipeline run against a fake Meta API with a generated video, which checks windowing, timestamp offsets and the evidence rules.
 
 ## Open-weights mode (Muse Spark Open)
-Pick **Open weights** on the upload screen to run the watching and writing passes on **Muse Spark Open**, Meta's open-weight model, through any OpenAI-compatible host. The live app uses **Nebius Token Factory** (`meta-models/muse-spark-open`), paid from our own account.
+Pick **Open weights** on the upload screen to run the watching and writing passes on **Muse Spark Open**, Meta's open-weight model, through any OpenAI-compatible host. The live app uses **Nebius Token Factory** (`meta-models/muse-spark-open`), paid from our own account: the hackathon's Baseten credits went to a pre-selected group and didn't reach us, so we used Nebius instead. Any OpenAI-compatible host works (Baseten, Fireworks, Modal, your own vLLM) by changing `SHADOW_OPEN_BASE_URL`.
 
 Hosts take video but not audio (Nebius rejects audio parts), so Shadow does the listening separately: **Muse Voice Transcribe** transcribes the narration first, and each 30-second video window goes to Muse Spark Open together with the narration lines for that window, with their times, as text. Voice Transcribe and SAM 3.1 still check quotes and draw pointers. Set `SHADOW_OPEN_AUDIO=1` for a host that does accept audio.
 
