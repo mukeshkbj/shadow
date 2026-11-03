@@ -14,6 +14,19 @@ from .config import settings
 from .jobs import STAGES, JobStore
 
 app = FastAPI(title="Shadow")
+
+
+@app.middleware("http")
+async def no_stale_page(request, call_next):
+    """The UI's index.html must never be cached, or visitors see an old build after a deploy.
+    Hashed files under /assets can be cached forever."""
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif not path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
                    allow_methods=["*"], allow_headers=["*"])
 store = JobStore(settings)

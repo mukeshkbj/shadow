@@ -62,3 +62,10 @@ def test_upload_needs_passcode_when_set(monkeypatch):
     r = c.post("/api/jobs", files={"file": ("a.mp4", b"x", "video/mp4")}, data={"passcode": "nope"})
     assert r.status_code == 403
     assert c.get("/api/health").json()["passcode_required"] is True
+
+
+def test_index_is_not_cached():
+    r = c.get("/api/health")
+    assert "no-cache" not in r.headers.get("cache-control", "")
+    r = c.get("/")   # 404 without a built UI is fine; the header still applies to page routes
+    assert r.headers.get("cache-control") == "no-cache"

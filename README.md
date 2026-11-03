@@ -16,6 +16,17 @@ Built for the Meta Global AI Developer Hackathon (Indie track, *Build for Your W
 5. The expert reviews: click any step to jump to that moment in the video, confirm or fix inferred steps, answer open questions.
 6. Export a cited playbook (Markdown) and a flow diagram (Mermaid).
 
+## Measured accuracy
+We scripted a recording of the demo app with known timings (`recordings/take-synthetic.ground_truth.json`) so timestamps could be scored, not eyeballed. Muse Spark 1.2, one call, 87-second clip:
+
+| What | Average error | Worst |
+|---|---|---|
+| On-screen actions (6 clicks/typing) | **0.5 s** | 1 s |
+| Spoken lines, timed by Muse Spark | 6.4 s | 14.5 s |
+| Spoken lines, snapped to Muse Voice Transcribe turns | **0.3 s** | 0.5 s |
+
+That gap is why spoken events take their time from the transcript. One silent action (choosing an email template) was missed; Shadow doesn't invent it.
+
 ## Run it (Windows)
 Needs Python 3.10+, Node 18+ and ffmpeg on PATH.
 
