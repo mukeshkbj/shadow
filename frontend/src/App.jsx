@@ -77,7 +77,7 @@ function Home() {
     }
     catch (e) { setErr(e.message); setBusy(false); }
   };
-  const demo = jobs.find(j => !j.sample && j.state === "done") || jobs.find(j => j.state === "done");
+  const demo = jobs.find(j => !j.sample && j.state === "done" && j.provider !== "open") || jobs.find(j => !j.sample && j.state === "done") || jobs.find(j => j.state === "done");
 
   return (
     <div className="page">
@@ -166,7 +166,7 @@ function Home() {
             {jobs.map(j => (
               <a key={j.id} className="job-row" href={j.state === "done" ? `#/job/${j.id}` : `#/job/${j.id}/processing`}>
                 <span className="stack-0 grow"><strong>{j.title || j.filename}</strong>
-                  <span className="muted small">{j.sample ? "Offline sample (no model calls)" : `Real run on the Meta Model API · ${j.filename}`}</span></span>
+                  <span className="muted small">{j.sample ? "Offline sample (no model calls)" : j.provider === "open" ? `Open weights · Muse Spark Open on Nebius + Meta Voice Transcribe & SAM 3.1 · ${j.filename}` : `Real run on the Meta Model API · ${j.filename}`}</span></span>
                 {j.counts && <span className="muted small">{j.counts.seen + j.counts.said + j.counts.inferred} steps · {j.counts.to_confirm} to confirm · {j.counts.open_questions} questions</span>}
                 <span className={`pill pill-${j.state}`}>{j.state === "done" ? (j.counts && (j.counts.to_confirm || j.counts.open_questions) ? "In review" : "Ready") : j.state === "error" ? "Failed" : "Processing"}</span>
               </a>
@@ -281,15 +281,16 @@ function EvidenceTimeline({ duration, events, turns, steps, sel, now, onSeek, on
   );
 }
 
-function Provenance({ step, events }) {
+function Provenance({ step, events, open }) {
+  const watcher = open ? "Muse Spark Open" : "Muse Spark 1.2";
   const byId = Object.fromEntries(events.map(e => [e.id, e]));
   const cited = (step.evidence_event_ids || []).map(id => byId[id]).filter(Boolean);
   const seen = cited.filter(e => e.source === "seen");
   const items = [];
-  if (seen.length) items.push(["spark", "Muse Spark 1.2", `saw it on screen at ${seen.map(e => ts(e.t)).join(", ")}`]);
+  if (seen.length) items.push(["spark", watcher, `saw it on screen at ${seen.map(e => ts(e.t)).join(", ")}`]);
   if (step.quote_check) items.push(["voice", "Voice Transcribe", `heard the quote at ${ts(step.quote_check.start)}–${ts(step.quote_check.end)}`]);
-  else if (step.source === "said") items.push(["voice", "Muse Spark 1.2", "heard it in the narration"]);
-  items.push(["wonder", "Muse Wonder", "wrote the step from the timeline"]);
+  else if (step.source === "said") items.push(["voice", open ? "Voice Transcribe" : "Muse Spark 1.2", "heard it in the narration"]);
+  items.push(["wonder", open ? "Muse Spark Open" : "Muse Wonder", "wrote the step from the timeline"]);
   if (step.downgraded_reason) items.push(["check warn", "Evidence check", step.downgraded_reason]);
   else items.push(["check", "Evidence check", step.source === "inferred" ? "kept it as an interpretation" : "found matching evidence"]);
   if (step.pointer) items.push(["sam", "Spark + SAM 3.1", `outlined “${step.pointer.label || step.field}”`]);
@@ -338,7 +339,7 @@ function Review({ id }) {
         <div className="row">
           <Logo />
           <span className="divider" />
-          <div className="stack-0"><strong>{pb.title}</strong><span className="muted small">{job?.sample ? "Offline sample · " : "Real run · Meta Model API · "}{ts(duration)} recording{job?.provider === "open" ? " · open weights (Muse Spark Open)" : ""}</span></div>
+          <div className="stack-0"><strong>{pb.title}</strong><span className="muted small">{job?.sample ? "Offline sample · " : job?.provider === "open" ? "Open weights · Muse Spark Open on Nebius · " : "Real run · Meta Model API · "}{ts(duration)} recording</span></div>
         </div>
         <StageRail active={tab === "replay" ? "replay" : "verify"} done={["record", ...(replayDone ? ["replay"] : [])]} />
         <a className="btn btn-dark" href={`#/job/${id}/export`}>Export playbook</a>
@@ -383,7 +384,7 @@ function Review({ id }) {
             <h3 className="evidence-title">{cur.text}</h3>
             <p className="m0">{cur.evidence || "—"}</p>
             {cur.quote && <blockquote className="quote">“{cur.quote}”</blockquote>}
-            <Provenance step={cur} events={tl.events} />
+            <Provenance step={cur} events={tl.events} open={job?.provider === "open"} />
             <p className="m0 xsmall muted">Pointers and model notes help you look. The timestamped recording is the evidence.</p>
           </div>
         </section>

@@ -20,7 +20,10 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
     .pip_install_from_requirements(str(ROOT / "backend" / "requirements.txt"))
-    .env({"SHADOW_DATA_DIR": "/data"})
+    .env({"SHADOW_DATA_DIR": "/data",
+          # open-weights mode: Muse Spark Open on Nebius Token Factory (the key is in the shadow-secrets secret)
+          "SHADOW_OPEN_BASE_URL": "https://api.tokenfactory.nebius.com/v1",
+          "SHADOW_OPEN_MODEL": "meta-models/muse-spark-open"})
     .add_local_dir(str(ROOT / "backend"), "/app/backend", ignore=["data", "tests", "**/__pycache__", ".venv"])
     .add_local_dir(str(ROOT / "frontend" / "dist"), "/app/frontend/dist")
 )
