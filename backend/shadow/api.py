@@ -1,15 +1,15 @@
 """FastAPI app. Run: uvicorn shadow.api:app --reload  (from the backend folder)."""
 import hmac
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import FastAPI, Form, HTTPException, UploadFile
+from fastapi import FastAPI, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import exporters, providers
+from . import evidence, exporters, providers
 from .config import settings
 from .jobs import STAGES, JobStore
 
@@ -32,14 +32,34 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http
 store = JobStore(settings)
 
 
-def _pb(job_id: str):
+def _review(x_shadow_review: Optional[str]) -> Optional[str]:
+    """On the public deploy each visitor reviews a private copy, so one judge's edits never reach the next."""
+    return x_shadow_review if settings.upload_passcode and x_shadow_review else None
+
+
+def _writer(x_shadow_review: Optional[str]) -> Optional[str]:
+    """On the public deploy an edit must name its private copy; it can never touch the shared run."""
+    review = _review(x_shadow_review)
+    if settings.upload_passcode and not review:
+        raise HTTPException(400, "Edits on this demo need a reviewer id. Reload the page and try again.")
+    return review
+
+
+def _pb(job_id: str, review: Optional[str] = None):
     try:
-        pb = store.playbook(job_id)
+        pb = store.playbook(job_id, review)
     except KeyError:
         pb = None
     if pb is None:
         raise HTTPException(404, "playbook not ready")
     return pb
+
+
+def _out(job_id: str, pb):
+    """Playbook plus derived data the UI needs; conflicts come from the same rule the exporter uses."""
+    tl = store.timeline(job_id)
+    conflicts = {s.id: c.model_dump() for s in pb.steps if tl and (c := evidence.conflict(s, tl))}
+    return {**pb.model_dump(), "counts": pb.counts(), "conflicts": conflicts}
 
 
 @app.get("/api/health")
@@ -49,7 +69,8 @@ def health():
             "open_model": settings.open_model if settings.open_base_url else None,
             "window_seconds": settings.window_seconds,
             "transcribe": settings.live and settings.use_transcribe, "pointer": settings.live and settings.use_pointer,
-            "passcode_required": bool(settings.upload_passcode)}
+            "passcode_required": bool(settings.upload_passcode),
+            "private_review": bool(settings.upload_passcode)}
 
 
 @app.get("/api/jobs")
@@ -88,9 +109,8 @@ def job_status(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/playbook")
-def get_playbook(job_id: str):
-    pb = _pb(job_id)
-    return {**pb.model_dump(), "counts": pb.counts()}
+def get_playbook(job_id: str, x_shadow_review: Optional[str] = Header(None)):
+    return _out(job_id, _pb(job_id, _review(x_shadow_review)))
 
 
 @app.get("/api/jobs/{job_id}/timeline")
@@ -104,21 +124,25 @@ def get_timeline(job_id: str):
 class StepEdit(BaseModel):
     confirmed: Optional[bool] = None
     text: Optional[str] = None
+    resolution: Optional[Literal["screen", "voice", "expert"]] = None
 
 
 @app.patch("/api/jobs/{job_id}/steps/{step_id}")
-def edit_step(job_id: str, step_id: str, edit: StepEdit):
-    pb = _pb(job_id)
+def edit_step(job_id: str, step_id: str, edit: StepEdit, x_shadow_review: Optional[str] = Header(None)):
+    review = _writer(x_shadow_review)
+    pb = _pb(job_id, review)
     step = next((s for s in pb.steps if s.id == step_id), None)
     if step is None:
         raise HTTPException(404, "no such step")
     if edit.text is not None and edit.text.strip():
-        step.text = edit.text.strip()
+        step.text = edit.text.strip()[:500]
         step.confirmed = True  # the expert wrote it, so it's theirs
     if edit.confirmed is not None:
         step.confirmed = edit.confirmed
-    store.save_playbook(job_id, pb)
-    return {**pb.model_dump(), "counts": pb.counts()}
+    if edit.resolution is not None:
+        step.resolution = edit.resolution
+    store.save_playbook(job_id, pb, review)
+    return _out(job_id, pb)
 
 
 class Answer(BaseModel):
@@ -126,24 +150,29 @@ class Answer(BaseModel):
 
 
 @app.post("/api/jobs/{job_id}/questions/{qid}")
-def answer_question(job_id: str, qid: str, body: Answer):
-    pb = _pb(job_id)
+def answer_question(job_id: str, qid: str, body: Answer, x_shadow_review: Optional[str] = Header(None)):
+    review = _writer(x_shadow_review)
+    pb = _pb(job_id, review)
     q = next((q for q in pb.open_questions if q.id == qid), None)
     if q is None:
         raise HTTPException(404, "no such question")
-    q.answer = body.answer.strip()
-    store.save_playbook(job_id, pb)
-    return {**pb.model_dump(), "counts": pb.counts()}
+    q.answer = body.answer.strip()[:1000]
+    store.save_playbook(job_id, pb, review)
+    return _out(job_id, pb)
 
 
 @app.get("/api/jobs/{job_id}/export.md", response_class=PlainTextResponse)
-def export_md(job_id: str):
-    return exporters.markdown(_pb(job_id))
+def export_md(job_id: str, request: Request, x_shadow_review: Optional[str] = Header(None)):
+    base = str(request.base_url)
+    if request.headers.get("x-forwarded-proto") == "https":
+        base = base.replace("http://", "https://", 1)
+    return exporters.markdown(_pb(job_id, _review(x_shadow_review)), store.timeline(job_id),
+                              lambda t: f"{base}#/job/{job_id}?t={round(t)}")
 
 
 @app.get("/api/jobs/{job_id}/export.mmd", response_class=PlainTextResponse)
-def export_mermaid(job_id: str):
-    return exporters.mermaid(_pb(job_id))
+def export_mermaid(job_id: str, x_shadow_review: Optional[str] = Header(None)):
+    return exporters.mermaid(_pb(job_id, _review(x_shadow_review)), store.timeline(job_id))
 
 
 @app.get("/api/jobs/{job_id}/replay")

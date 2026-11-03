@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api, ts } from "./api.js";
+import { api, startOver, ts } from "./api.js";
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || "#/");
@@ -34,6 +34,7 @@ function StageRail({ active, done = [] }) {
   );
 }
 
+const TABS = [["steps", "Steps"], ["flow", "Flow"], ["questions", "Questions"], ["replay", "Replay"]];
 const SOURCE_LABEL = { seen: "Seen", said: "Said", inferred: "Inferred" };
 function Badge({ step }) {
   const kind = step.source === "inferred" && step.confirmed ? "confirmed" : step.source;
@@ -43,12 +44,23 @@ function Badge({ step }) {
 
 export default function App() {
   const hash = useHash();
-  const m = hash.match(/^#\/job\/([\w-]+)(?:\/(processing|export))?/);
+  const m = hash.match(/^#\/job\/([\w-]+)(?:\/(processing|export))?(?:\?t=(\d+))?/);
   if (!m) return <Home />;
-  const [, id, view] = m;
+  const [, id, view, at] = m;
   if (view === "processing") return <Processing id={id} />;
   if (view === "export") return <Export id={id} />;
-  return <Review id={id} />;
+  return <Review id={id} at={at == null ? null : Number(at)} />;
+}
+
+function Unavailable({ what, detail }) {
+  return (
+    <div className="page"><header className="bar"><Logo /><a className="btn" href="#/">Back</a></header>
+      <main className="narrow stack-sm" role="alert">
+        <h1 className="h1 h1-sm">Shadow could not load {what}</h1>
+        <p className="m0 muted">{detail === "playbook not ready" ? "This job has no finished playbook yet." : detail}</p>
+      </main>
+    </div>
+  );
 }
 
 /* ---------------- Home / upload ---------------- */
@@ -99,9 +111,10 @@ function Home() {
             {demo && <a className="btn btn-accent btn-lg" href={`#/job/${demo.id}`}>Open the live demo</a>}
             <a className="btn btn-ghost btn-lg" href="#upload">Upload a recording</a>
           </div>
+          {demo && <p className="hero-proof">In the live demo the expert says <q>I always take the oldest one first</q>. The screen shows the inbox sorted <b>Newest first</b>. Shadow does not choose. It asks.</p>}
           </div>
           <a className="hero-shot" href={demo ? `#/job/${demo.id}` : "#upload"} aria-label="Open the live demo">
-            <img src="/hero-review.jpg" alt="Shadow's review screen: the recording, an evidence timeline with screen, voice and step lanes, and the cited steps" />
+            <img src="/hero-review.jpg" width="1280" height="800" fetchpriority="high" alt="Shadow's review screen: the recording with the Newest first sort outlined, the narration line saying the oldest is taken first, and a card asking the expert which one is the rule" />
           </a>
           </div>
           <ol className="loop" id="how">
@@ -229,7 +242,7 @@ function Processing({ id }) {
 }
 
 /* ---------------- Review ---------------- */
-function TrustBar({ pb }) {
+function TrustBar({ pb, onJump }) {
   const steps = pb.steps;
   const counts = { seen: 0, said: 0, confirmed: 0, inferred: 0 };
   steps.forEach(s => { counts[kindOf(s)] += 1; });
@@ -241,7 +254,7 @@ function TrustBar({ pb }) {
         {steps.map(s => <span key={s.id} className={`trust-seg seg-${kindOf(s)}`} />)}
       </div>
       <span className="trust-text"><strong>{backed} of {steps.length}</strong> steps backed by the recording
-        {counts.inferred > 0 && <> · <b className="warn">{counts.inferred} need{counts.inferred === 1 ? "s" : ""} you</b></>}
+        {counts.inferred > 0 && <> · <button className="link-btn warn" onClick={onJump}>{counts.inferred} need{counts.inferred === 1 ? "s" : ""} you</button></>}
         {openQ > 0 && <> · <b className="accent">{openQ} open question{openQ === 1 ? "" : "s"}</b></>}
       </span>
     </div>
@@ -250,6 +263,9 @@ function TrustBar({ pb }) {
 
 function EvidenceTimeline({ duration, events, turns, steps, sel, now, onSeek, onPick }) {
   const D = duration || 1;
+  const cited = new Set(steps[sel]?.evidence_event_ids || []);
+  const heard = events.filter(e => e.source === "said" && cited.has(e.id));
+  const turnCited = u => heard.some(e => e.t >= u.start - 0.5 && e.t <= u.end + 0.5);
   const pct = t => `${Math.min(100, Math.max(0, (t / D) * 100))}%`;
   const seekFrom = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -262,11 +278,11 @@ function EvidenceTimeline({ duration, events, turns, steps, sel, now, onSeek, on
         <div className="tl-track">{ticks.map(t => <span key={t} className="tl-tick mono" style={{ left: pct(t) }}>{ts(t)}</span>)}</div></div>
       <div className="tl-row"><span className="tl-label">Screen</span>
         <div className="tl-track tl-click" onClick={seekFrom} title="What Muse Spark saw on screen">
-          {events.filter(e => e.source === "seen").map(e => <span key={e.id} className="tl-dot" style={{ left: pct(e.t) }} title={`${ts(e.t)} · ${e.action}`} />)}
+          {events.filter(e => e.source === "seen").map(e => <span key={e.id} className={`tl-dot ${cited.has(e.id) ? "cited" : ""}`} style={{ left: pct(e.t) }} title={`${ts(e.t)} · ${e.action}`} />)}
         </div></div>
       <div className="tl-row"><span className="tl-label">Voice</span>
         <div className="tl-track tl-click" onClick={seekFrom} title="Narration turns from Muse Voice Transcribe">
-          {turns.map((u, i) => <span key={i} className={`tl-turn ${now >= u.start && now <= u.end ? "on" : ""}`} style={{ left: pct(u.start), width: pct(Math.max(0.6, u.end - u.start)) }} title={`${ts(u.start)} · “${u.text}”`} />)}
+          {turns.map((u, i) => <span key={i} className={`tl-turn ${now >= u.start && now <= u.end ? "on" : ""} ${turnCited(u) ? "cited" : ""}`} style={{ left: pct(u.start), width: pct(Math.max(0.6, u.end - u.start)) }} title={`${ts(u.start)} · “${u.text}”`} />)}
         </div></div>
       <div className="tl-row"><span className="tl-label">Steps</span>
         <div className="tl-track">
@@ -302,7 +318,51 @@ function Provenance({ step, events, open }) {
   );
 }
 
-function Review({ id }) {
+const FOLLOWED = { screen: "followed the screen", voice: "followed the narration", expert: "wrote the rule" };
+
+function Disagreement({ s, clash, canPlay, onPlay, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(s.text);
+  const head = `clash-${s.id}`;
+  return (
+    <div className="clash" role="group" aria-labelledby={head}>
+      <p id={head} className="clash-head">Screen and voice disagree. Shadow did not pick one.</p>
+      <div className="clash-sides">
+        <div className="clash-side clash-screen">
+          <span className="clash-kind mono">Screen · {ts(clash.seen_t)}</span>
+          <span className="clash-text">{clash.seen}</span>
+          {canPlay && <button className="btn btn-sm" onClick={() => onPlay(clash.seen_t, clash.seen_t + 4)}>Watch it</button>}
+        </div>
+        <span className="clash-vs mono" aria-hidden="true">vs</span>
+        <div className="clash-side clash-voice">
+          <span className="clash-kind mono">Voice · {ts(clash.said_t)}</span>
+          <q className="clash-text">{clash.said}</q>
+          {canPlay && <button className="btn btn-sm" onClick={() => onPlay(clash.said_t, clash.said_end ?? clash.said_t + 5)}>Hear it</button>}
+        </div>
+      </div>
+      {editing ? (
+        <form className="row" onSubmit={e => { e.preventDefault(); if (text.trim()) onSave(text, "expert"); }}>
+          <label className="sr-only" htmlFor={`fix-${s.id}-clash`}>The rule, in your words</label>
+          <input id={`fix-${s.id}-clash`} className="input grow" value={text} onChange={e => setText(e.target.value)} autoFocus />
+          <button className="btn btn-dark" type="submit">Save</button>
+          <button className="btn" type="button" onClick={() => setEditing(false)}>Cancel</button>
+        </form>
+      ) : (
+        <div className="stack-xs">
+          <strong className="small">Which one is the rule?</strong>
+          <div className="row">
+            <button className="btn btn-dark" onClick={() => onSave(`${s.text}: follow the screen (${clash.seen})`, "screen")}>Follow the screen</button>
+            <button className="btn" onClick={() => onSave(`${s.text}: follow the narration (“${clash.said}”)`, "voice")}>Follow the voice</button>
+            <button className="btn" onClick={() => setEditing(true)}>Write it myself</button>
+          </div>
+        </div>
+      )}
+      <p className="m0 xsmall muted">Your answer becomes the step the Replay agent runs. In testing, a bare “run it anyway” here sent the agent to the wrong customer.</p>
+    </div>
+  );
+}
+
+function Review({ id, at }) {
   const [pb, setPb] = useState(null);
   const [tl, setTl] = useState({ events: [], turns: [], duration: 0 });
   const [job, setJob] = useState(null);
@@ -311,17 +371,29 @@ function Review({ id }) {
   const [sel, setSel] = useState(0);
   const [tab, setTab] = useState("steps");
   const [now, setNow] = useState(0);
+  const [privateReview, setPrivateReview] = useState(false);
+  const [round, setRound] = useState(0);
   const video = useRef(null);
+  const stopAt = useRef(null);
 
+  useEffect(() => { api.health().then(h => setPrivateReview(!!h.private_review)).catch(() => {}); }, []);
   useEffect(() => {
     api.playbook(id).then(setPb).catch(e => setErr(e.message));
+  }, [id, round]);
+  useEffect(() => {
+    if (at == null || !pb) return;
+    let i = 0; pb.steps.forEach((s, k) => { if (s.t_start <= at + 0.25) i = k; });
+    setSel(i); setNow(at);
+    if (video.current) video.current.currentTime = at;
+  }, [at, !!pb]);
+  useEffect(() => {
     api.job(id).then(setJob).catch(() => {});
     api.timeline(id).then(t => setTl({ events: t.events || [], turns: t.turns || [], duration: t.duration || 0 })).catch(() => {});
     api.replay(id).then(setReplay).catch(() => setReplay(null));
   }, [id]);
 
-  if (err) return <div className="page"><header className="bar"><Logo /></header><main className="narrow"><p className="error">{err}</p></main></div>;
-  if (!pb) return <div className="page"><header className="bar"><Logo /></header><main className="narrow muted">Loading…</main></div>;
+  if (err) return <Unavailable what="this playbook" detail={err} />;
+  if (!pb) return <div className="page"><header className="bar"><Logo /></header><main className="narrow muted" role="status">Loading the playbook…</main></div>;
 
   const steps = pb.steps;
   const cur = steps[sel] || steps[0];
@@ -329,7 +401,18 @@ function Review({ id }) {
   const duration = pb.duration || tl.duration;
   const seek = (t) => { setNow(t); if (video.current) video.current.currentTime = t; };
   const pick = (i) => { setSel(i); if (steps[i]) seek(steps[i].t_start); };
+  const play = (from, to) => {
+    const v = video.current;
+    if (!v) return;
+    seek(from); stopAt.current = to;
+    v.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    v.play().catch(() => { stopAt.current = null; });
+  };
+  const firstOpen = steps.findIndex(s => s.source === "inferred" && !s.confirmed);
   const update = (p) => p.then(setPb).catch(e => setErr(e.message));
+  const clashOf = (s) => (!s.confirmed && pb.conflicts?.[s.id]) || null;
+  const curClash = clashOf(cur);
+  const resolve = (step, text, resolution) => update(api.editStep(id, step.id, { text, resolution }));
   const saying = tl.turns.find(u => now >= u.start - 0.2 && now <= u.end + 0.2);
   const replayDone = replay && !replay.stopped && replay.actions?.length > 0;
 
@@ -344,17 +427,22 @@ function Review({ id }) {
         <StageRail active={tab === "replay" ? "replay" : "verify"} done={["record", ...(replayDone ? ["replay"] : [])]} />
         <a className="btn btn-dark" href={`#/job/${id}/export`}>Export playbook</a>
       </header>
-      <TrustBar pb={pb} />
+      <TrustBar pb={pb} onJump={() => { setTab("steps"); if (firstOpen >= 0) pick(firstOpen); }} />
+      {privateReview && (
+        <div className="private-note small">Try it: confirm a step or answer a question. Your changes stay in this browser, so the next visitor sees the original run.
+          {(pb.steps.some(s => s.confirmed) || pb.open_questions.some(q => q.answer)) && <button className="link-btn" onClick={() => { startOver(); setRound(r => r + 1); }}>Start over</button>}</div>
+      )}
 
       <main className="split">
         <section className="col-main stack-md" aria-label="Recording">
           <div className="player">
             {job?.has_video ? (
               <div className="video-wrap">
-                <video ref={video} src={api.videoUrl(id)} controls preload="metadata"
+                <video ref={video} src={api.videoUrl(id)} controls preload="metadata" onPause={() => { stopAt.current = null; }} onLoadedMetadata={e => { if (at != null) e.currentTarget.currentTime = at; }}
                        onTimeUpdate={e => {
                          const t = e.currentTarget.currentTime;
                          setNow(t);
+                         if (stopAt.current != null && t >= stopAt.current) { stopAt.current = null; e.currentTarget.pause(); }
                          let i = 0; steps.forEach((s, k) => { if (s.t_start <= t + 0.25) i = k; });
                          if (i !== sel) setSel(i);
                        }} />
@@ -382,7 +470,8 @@ function Review({ id }) {
               <Badge step={cur} />
             </div>
             <h3 className="evidence-title">{cur.text}</h3>
-            <p className="m0">{cur.evidence || "—"}</p>
+            {curClash && <div className="clash-narrow"><Disagreement key={cur.id} s={cur} clash={curClash} canPlay={!!job?.has_video} onPlay={play} onSave={(text, r) => resolve(cur, text, r)} /></div>}
+            <p className={`m0 ${curClash ? "clash-wide" : ""}`}>{cur.evidence || "—"}</p>
             {cur.quote && <blockquote className="quote">“{cur.quote}”</blockquote>}
             <Provenance step={cur} events={tl.events} open={job?.provider === "open"} />
             <p className="m0 xsmall muted">Pointers and model notes help you look. The timestamped recording is the evidence.</p>
@@ -390,11 +479,19 @@ function Review({ id }) {
         </section>
 
         <section className="col-side card flush" aria-label="Playbook">
-          <div role="tablist" aria-label="Playbook views" className="tabs">
-            {[["steps", `Steps · ${steps.length}`], ["flow", "Flow"], ["questions", `Questions · ${c.open_questions}`], ["replay", "Replay"]].map(([k, l]) => (
-              <button key={k} role="tab" aria-selected={tab === k} className={`tab ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>{l}{k === "replay" && replayDone && <span className="tab-dot" />}</button>
+          <div role="tablist" aria-label="Playbook views" className="tabs" onKeyDown={e => {
+            const keys = TABS.map(t => t[0]); const i = keys.indexOf(tab);
+            const next = e.key === "ArrowRight" ? keys[(i + 1) % keys.length] : e.key === "ArrowLeft" ? keys[(i + keys.length - 1) % keys.length] : null;
+            if (next) { e.preventDefault(); setTab(next); document.getElementById(`tab-${next}`)?.focus(); }
+          }}>
+            {TABS.map(([k, l]) => (
+              <button key={k} id={`tab-${k}`} role="tab" aria-selected={tab === k} aria-controls="tabpanel" tabIndex={tab === k ? 0 : -1}
+                      className={`tab ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>
+                {k === "steps" ? `${l} · ${steps.length}` : k === "questions" ? `${l} · ${c.open_questions}` : l}{k === "replay" && replayDone && <span className="tab-dot" />}
+              </button>
             ))}
           </div>
+          <div id="tabpanel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
           {tab === "steps" && (
             <ol className="steps">
               {steps.map((s, i) => (
@@ -405,8 +502,14 @@ function Review({ id }) {
                       <span className="mono xsmall muted">{ts(s.t_start)}{s.kind === "decision" ? " · decision" : ""}</span></span>
                     <Badge step={s} />
                   </button>
+                  {clashOf(s) ? (
+                    <div className="step-note clash-wide"><Disagreement s={s} clash={clashOf(s)} canPlay={!!job?.has_video} onPlay={play} onSave={(text, r) => resolve(s, text, r)} /></div>
+                  ) : <>
+                  {s.source === "inferred" && !s.confirmed && (s.downgraded_reason || s.evidence) && <p className="step-note step-why small"><b>Why it needs you:</b> {s.downgraded_reason || s.evidence}</p>}
                   {s.source === "inferred" && !s.confirmed && <StepReview s={s} onConfirm={() => update(api.editStep(id, s.id, { confirmed: true }))} onFix={(text) => update(api.editStep(id, s.id, { text }))} />}
-                  {s.source === "inferred" && s.confirmed && <div className="step-note ok small">Confirmed by the expert · was inferred</div>}
+                  </>}
+                  {s.source === "inferred" && s.confirmed && <div className="step-note ok small">{pb.conflicts?.[s.id] && s.resolution
+                    ? `Screen and voice disagreed. The expert ${FOLLOWED[s.resolution]}.` : "Confirmed by the expert · was inferred."} Replay runs this wording.</div>}
                 </li>
               ))}
             </ol>
@@ -417,6 +520,7 @@ function Review({ id }) {
           {pb.notes?.length > 0 && tab === "steps" && (
             <details className="notes small"><summary>Evidence check log ({pb.notes.length})</summary><ul>{pb.notes.map((n, i) => <li key={i}>{n}</li>)}</ul></details>
           )}
+          </div>
         </section>
       </main>
     </div>
@@ -575,8 +679,13 @@ function Export({ id }) {
   const [pb, setPb] = useState(null);
   const [md, setMd] = useState("");
   const [mmd, setMmd] = useState("");
-  useEffect(() => { api.playbook(id).then(setPb); api.exportMd(id).then(setMd); api.exportMmd(id).then(setMmd); }, [id]);
-  if (!pb) return null;
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    const fail = e => setErr(e.message);
+    api.playbook(id).then(setPb, fail); api.exportMd(id).then(setMd, fail); api.exportMmd(id).then(setMmd, fail);
+  }, [id]);
+  if (err) return <Unavailable what="the export" detail={err} />;
+  if (!pb) return <div className="page"><header className="bar"><Logo /></header><main className="narrow muted" role="status">Preparing the export…</main></div>;
   const c = pb.counts;
   const slug = pb.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   return (
@@ -587,16 +696,16 @@ function Export({ id }) {
           <div className="stack-sm"><h1 className="h1 h1-sm">Export the playbook</h1><p className="m0 muted">Every step keeps its timestamp and source, so whoever reads it can check it.</p></div>
           {(c.to_confirm > 0 || c.open_questions > 0) && (
             <div className="notice stack-xs">
-              <strong>{c.to_confirm} steps still inferred, {c.open_questions} questions open</strong>
-              <span className="small">They'll be marked <b className="warn">Unconfirmed</b> and listed under “Open questions”.</span>
+              <strong>{[c.to_confirm > 0 && `${c.to_confirm} step${c.to_confirm === 1 ? "" : "s"} still unconfirmed`, c.open_questions > 0 && `${c.open_questions} question${c.open_questions === 1 ? "" : "s"} open`].filter(Boolean).join(", ")}</strong>
+              <span className="small">The export marks them <b className="warn">Unconfirmed</b> and lists them under “Open questions”.</span>
               <a href={`#/job/${id}`} className="small">Finish review first</a>
             </div>
           )}
           <div className="card flush">
             <div className="export-row"><div className="stack-0 grow"><strong>Cited playbook</strong><span className="muted small">Steps, sources, timestamps, open questions</span></div>
-              <button className="btn btn-dark" onClick={() => download(`${slug}.md`, md, "text/markdown")}>Markdown</button></div>
+              <button className="btn btn-dark" disabled={!md} onClick={() => download(`${slug}.md`, md, "text/markdown")}>Markdown</button></div>
             <div className="export-row"><div className="stack-0 grow"><strong>Flow diagram</strong><span className="muted small">Mermaid; open questions drawn dashed</span></div>
-              <button className="btn btn-dark" onClick={() => download(`${slug}.mmd`, mmd, "text/plain")}>Mermaid</button></div>
+              <button className="btn btn-dark" disabled={!mmd} onClick={() => download(`${slug}.mmd`, mmd, "text/plain")}>Mermaid</button></div>
           </div>
         </section>
         <section className="col-main stack-sm" aria-label="Preview">

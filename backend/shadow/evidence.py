@@ -8,9 +8,9 @@ Rules
 - A decision branch that leads nowhere becomes an open question.
 """
 import re
-from typing import Iterable
+from typing import Iterable, Optional
 
-from .schemas import Event, OpenQuestion, Playbook, QuoteCheck, Step, Timeline
+from .schemas import Conflict, Event, OpenQuestion, Playbook, QuoteCheck, Step, Timeline
 
 _WORD = re.compile(r"[a-z0-9£$]+")
 _NUM = {w: str(i) for i, w in enumerate(
@@ -46,6 +46,24 @@ def _next_qid(pb: Playbook) -> str:
     while f"q{n}" in ids:
         n += 1
     return f"q{n}"
+
+
+def conflict(step: Step, tl: Timeline) -> Optional[Conflict]:
+    """The model marks a step inferred and cites both sides when screen and narration disagree
+    (prompts.py). A step the check itself downgraded is a missing-evidence case, not a conflict."""
+    if step.source != "inferred" or step.downgraded_reason:
+        return None
+    by_id = {e.id: e for e in tl.events}
+    cited = [by_id[i] for i in step.evidence_event_ids if i in by_id]
+    seen = [e for e in cited if e.source == "seen"]
+    said = next((e for e in cited if e.source == "said"), None)
+    if not seen or said is None:
+        return None
+    shown = next((e for e in seen if step.field and step.field in e.action), seen[0])
+    turn = next((u for u in tl.turns if u.start - 0.5 <= said.t <= u.end + 0.5), None)
+    return Conflict(seen_t=shown.t, seen=shown.action,
+                    said_t=turn.start if turn else said.t, said_end=turn.end if turn else None,
+                    said=said.quote or (turn.text if turn else said.action))
 
 
 def check(pb: Playbook, tl: Timeline, slack: float = 4.0) -> Playbook:

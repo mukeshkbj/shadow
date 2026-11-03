@@ -69,3 +69,33 @@ def test_index_is_not_cached():
     assert "no-cache" not in r.headers.get("cache-control", "")
     r = c.get("/")   # 404 without a built UI is fine; the header still applies to page routes
     assert r.headers.get("cache-control") == "no-cache"
+
+
+def test_public_deploy_keeps_each_visitors_review_private(monkeypatch):
+    monkeypatch.setattr(api_mod, "settings", replace(api_mod.settings, upload_passcode="lamp-42"))
+    base = c.get("/api/jobs/sample/playbook").json()
+    before = base["counts"]
+    step = next(s["id"] for s in base["steps"] if s["source"] == "inferred" and not s["confirmed"])
+    judge_a, judge_b = {"X-Shadow-Review": "judgeaaaa1"}, {"X-Shadow-Review": "judgebbbb2"}
+    pb = c.patch(f"/api/jobs/sample/steps/{step}", json={"confirmed": True}, headers=judge_a).json()
+    assert pb["counts"]["to_confirm"] == before["to_confirm"] - 1
+    c.post("/api/jobs/sample/questions/q3", json={"answer": "Ask the manager."}, headers=judge_a)
+    assert "Ask the manager." in c.get("/api/jobs/sample/export.md", headers=judge_a).text
+    assert c.get("/api/jobs/sample/playbook", headers=judge_a).json()["counts"]["to_confirm"] == before["to_confirm"] - 1
+    assert c.get("/api/jobs/sample/playbook", headers=judge_b).json()["counts"] == before
+    assert c.get("/api/jobs/sample/playbook").json()["counts"] == before
+    assert c.get("/api/jobs/sample/playbook", headers={"X-Shadow-Review": "../../x"}).status_code == 404
+    assert c.patch(f"/api/jobs/sample/steps/{step}", json={"confirmed": True}).status_code == 400
+    assert c.post("/api/jobs/sample/questions/q3", json={"answer": "x"}).status_code == 400
+    assert c.get("/api/jobs/sample/playbook").json()["counts"] == before
+
+
+def test_conflict_resolution_is_recorded_and_exported():
+    pb = c.get("/api/jobs/sample/playbook").json()
+    assert "s1" in pb["conflicts"] and pb["conflicts"]["s1"]["said"]
+    assert c.patch("/api/jobs/sample/steps/s1", json={"resolution": "nonsense"}).status_code == 422
+    pb = c.patch("/api/jobs/sample/steps/s1", json={"text": "Take the newest request", "resolution": "screen"}).json()
+    s1 = next(s for s in pb["steps"] if s["id"] == "s1")
+    assert s1["confirmed"] and s1["resolution"] == "screen" and "s1" in pb["conflicts"]
+    md = c.get("/api/jobs/sample/export.md").text
+    assert "The expert followed the screen" in md and "#/job/sample?t=" in md

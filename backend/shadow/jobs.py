@@ -15,6 +15,7 @@ from .schemas import Playbook, Timeline
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 STAGES = ["uploaded", "timeline", "playbook", "evidence", "done"]
+MAX_REVIEWS = 2000
 
 
 class JobStore:
@@ -56,12 +57,25 @@ class JobStore:
                 out.append(st)
         return out
 
-    def playbook(self, job_id: str) -> Optional[Playbook]:
+    def _review_path(self, job_id: str, review: str) -> Path:
+        if not (8 <= len(review) <= 40 and review.isalnum()):
+            raise KeyError(review)
+        return self.dir(job_id) / "reviews" / f"{review}.json"
+
+    def playbook(self, job_id: str, review: Optional[str] = None) -> Optional[Playbook]:
         p = self.dir(job_id) / "playbook.json"
+        if review and self._review_path(job_id, review).exists():
+            p = self._review_path(job_id, review)
         return Playbook.model_validate_json(p.read_text(encoding="utf-8")) if p.exists() else None
 
-    def save_playbook(self, job_id: str, pb: Playbook) -> None:
-        (self.dir(job_id) / "playbook.json").write_text(pb.model_dump_json(indent=2), encoding="utf-8")
+    def save_playbook(self, job_id: str, pb: Playbook, review: Optional[str] = None) -> None:
+        p = self.dir(job_id) / "playbook.json"
+        if review:
+            p = self._review_path(job_id, review)
+            p.parent.mkdir(exist_ok=True)
+            if not p.exists() and len(list(p.parent.iterdir())) >= MAX_REVIEWS:
+                return
+        p.write_text(pb.model_dump_json(indent=2), encoding="utf-8")
 
     def timeline(self, job_id: str) -> Optional[Timeline]:
         p = self.dir(job_id) / "timeline.json"

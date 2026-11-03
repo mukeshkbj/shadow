@@ -50,6 +50,15 @@ class QuoteCheck(BaseModel):
     text: str
 
 
+class Conflict(BaseModel):
+    """Screen and narration disagree on one step: both sides, with their times."""
+    seen_t: float
+    seen: str
+    said_t: float
+    said_end: Optional[float] = None
+    said: str
+
+
 class Step(BaseModel):
     id: str
     t_start: float
@@ -63,6 +72,7 @@ class Step(BaseModel):
     evidence_event_ids: list[str] = []
     field: str = ""             # on-screen element the step refers to (used for the visual pointer)
     confirmed: bool = False     # expert confirmed an inferred step
+    resolution: Literal["", "screen", "voice", "expert"] = ""  # how the expert settled a screen/voice conflict
     downgraded_reason: str = ""  # set by the evidence check when a claimed seen/said had no support
     quote_check: Optional[QuoteCheck] = None  # narration turn that contains the quote (Voice Transcribe)
     pointer: Optional[Pointer] = None         # SAM 3.1 visual pointer

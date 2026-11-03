@@ -1,5 +1,10 @@
 """Deterministic exporters: cited Markdown playbook and Mermaid flow."""
-from .schemas import Playbook
+from typing import Callable, Optional
+
+from .evidence import conflict
+from .schemas import Playbook, Timeline
+
+FOLLOWED = {"screen": "followed the screen", "voice": "followed the narration", "expert": "wrote the rule"}
 
 LABEL = {"seen": "Seen", "said": "Said", "inferred": "Unconfirmed"}
 
@@ -17,7 +22,7 @@ def _label(step) -> str:
     return LABEL[step.source]
 
 
-def markdown(pb: Playbook, video_url: str | None = None) -> str:
+def markdown(pb: Playbook, tl: Optional[Timeline] = None, link: Optional[Callable[[float], str]] = None) -> str:
     c = pb.counts()
     lines = [f"# {pb.title}", "",
              f"_From a {ts(pb.duration)} screen recording. "
@@ -28,13 +33,20 @@ def markdown(pb: Playbook, video_url: str | None = None) -> str:
              "## Steps", ""]
     for i, s in enumerate(pb.steps, 1):
         stamp = ts(s.t_start)
-        link = f"[{stamp}]({video_url}#t={int(s.t_start)})" if video_url else stamp
-        lines.append(f"{i}. **{s.text}** — {_label(s)} · {link}")
+        lines.append(f"{i}. **{s.text}** — {_label(s)} · " + (f"[{stamp}]({link(s.t_start)})" if link else stamp))
         if s.detail:
             lines.append(f"   - {s.detail}")
         if s.quote:
             lines.append(f"   - > “{s.quote}”")
-        if s.source == "inferred" and not s.confirmed and s.evidence:
+        c = conflict(s, tl) if tl else None
+        if c:
+            both = f"screen at {ts(c.seen_t)}: {c.seen}; narration at {ts(c.said_t)}: “{c.said}”"
+            if s.confirmed:
+                lines.append(f"   - Screen and voice disagreed ({both}). "
+                             f"The expert {FOLLOWED.get(s.resolution, 'confirmed this wording')}.")
+            else:
+                lines.append(f"   - Screen and voice disagree ({both}). Not settled yet.")
+        elif s.source == "inferred" and not s.confirmed and s.evidence:
             lines.append(f"   - Why unconfirmed: {s.evidence}")
     open_q = [q for q in pb.open_questions if not q.answer]
     answered = [q for q in pb.open_questions if q.answer]
@@ -51,13 +63,14 @@ def _esc(s: str) -> str:
     return s.replace('"', "'").replace("\n", " ")
 
 
-def mermaid(pb: Playbook) -> str:
+def mermaid(pb: Playbook, tl: Optional[Timeline] = None) -> str:
     out = ["flowchart TD"]
     steps = pb.steps
     decisions = {d.step_id: d for d in pb.decisions}
     q_by_id = {q.id: q for q in pb.open_questions}
     for s in steps:
-        label = f"{_esc(s.text)}<br/><small>{_label(s)} · {ts(s.t_start)}</small>"
+        clash = " · screen vs voice" if tl and not s.confirmed and conflict(s, tl) else ""
+        label = f"{_esc(s.text)}<br/><small>{_label(s)} · {ts(s.t_start)}{clash}</small>"
         if s.id in decisions:
             out.append(f'  {s.id}{{"{_esc(decisions[s.id].question)}<br/><small>{ts(s.t_start)}</small>"}}')
         else:

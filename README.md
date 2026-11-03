@@ -20,9 +20,9 @@ Every team has one person who knows how the job is really done. AI can write a p
 4. **Muse Wonder** drafts the playbook from that log. Every step is labelled **Seen**, **Said** or **Inferred**; decisions get branches; branches nobody showed become **open questions**, not guesses.
 5. **Evidence check** (plain code, no AI) verifies every step against the log. No evidence: the step becomes a question. A "Said" quote that wasn't heard: downgraded to Inferred.
 6. **Muse Spark + SAM 3.1** draw a visual pointer for the reviewer: SAM can't read labels, so Spark finds the field by its label and SAM 3.1 outlines it. It helps you look; it is not proof.
-7. **Verify.** The expert reviews on one timeline (screen, voice, steps). Click any step and the video jumps to its moment. When screen and voice disagree, Shadow flags the step instead of choosing: in the demo she says "I always take the oldest one first" while the inbox is sorted *newest first*.
+7. **Verify.** The expert reviews on one timeline (screen, voice, steps). Click any step and the video jumps to its moment. When screen and voice disagree, Shadow flags the step instead of choosing: in the demo she says "I always take the oldest one first" while the inbox is sorted *newest first*. The step opens as a **Screen vs Voice** card: **Watch it** plays the screen moment, **Hear it** plays the exact narration turn, and the expert picks **Follow the screen**, **Follow the voice** or writes the rule. That answer becomes the step Replay runs.
 8. **Replay.** **Muse Spark 1.3** drives the real app from the confirmed playbook, one action at a time, using only the rules the expert said aloud. It stops and asks at every unconfirmed step and every branch the recording never showed.
-9. Export a cited playbook (Markdown) and a flow diagram (Mermaid).
+9. Export a cited playbook (Markdown) and a flow diagram (Mermaid). Every timestamp in the Markdown is a link that opens the recording at that second (`#/job/<id>?t=<seconds>`), and a screen/voice conflict is written down with both sides and what the expert decided, so the document carries its own decision record.
 
 | Screen and voice disagree → Shadow asks | Replay: the agent does the job back |
 |---|---|
@@ -72,7 +72,7 @@ npm run dev        # http://localhost:5173
 | `SHADOW_POINTER` | `1` | Add SAM 3.1 visual pointers (`0` = off) |
 | `SHADOW_OPEN_BASE_URL` | (unset) | Open-weights mode host, e.g. `https://inference.baseten.co/v1` |
 | `SHADOW_OPEN_API_KEY` | (unset) | Key for that host |
-| `SHADOW_UPLOAD_PASSCODE` | (unset) | If set, uploads need this passcode (viewing stays open) |
+| `SHADOW_UPLOAD_PASSCODE` | (unset) | If set, uploads need this passcode (viewing stays open). It also marks the public deploy: each visitor's confirmations and answers are saved as a private copy for their browser, so the featured runs stay as recorded |
 | `SHADOW_OPEN_MODEL` | `meta-models/muse-spark-open` | Muse Spark Open model ID on that host |
 
 ### Tests

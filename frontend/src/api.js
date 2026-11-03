@@ -1,5 +1,13 @@
+const REVIEW_KEY = "shadow-review";
+const newReview = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, "0")).join("");
+let review = (() => { try { return localStorage.getItem(REVIEW_KEY) || newReview(); } catch { return newReview(); } })();
+const keep = () => { try { localStorage.setItem(REVIEW_KEY, review); } catch {} };
+keep();
+
+export const startOver = () => { review = newReview(); keep(); };
+
 async function req(path, opts = {}) {
-  const r = await fetch(path, opts);
+  const r = await fetch(path, { ...opts, headers: { ...opts.headers, "X-Shadow-Review": review } });
   if (!r.ok) {
     let msg = `${r.status}`;
     try { msg = (await r.json()).detail || msg; } catch {}

@@ -100,3 +100,27 @@ def test_said_events_snap_to_transcript_turns():
                   turns=[Turn(start=72.8, end=75.3, text="last thing the confirmation email")])
     assert align_said_events(tl) == 1
     assert tl.events[0].t == 72.8 and tl.events[0].source == "said"
+
+
+def test_conflict_needs_both_sides_and_skips_downgraded_steps():
+    draft, tl = sample()
+    pb = evidence.check(draft, tl)
+    by = {s.id: s for s in pb.steps}
+    c = evidence.conflict(by["s1"], tl)
+    assert c is not None and "newest first" in c.seen and c.said == "I always take the oldest one first."
+    assert evidence.conflict(by["s4"], tl) is None      # downgraded by the check: missing evidence, not a conflict
+    assert evidence.conflict(by["s3"], tl) is None      # a said step is never a conflict
+
+
+def test_markdown_records_the_decision_and_links_each_moment():
+    draft, tl = sample()
+    pb = evidence.check(draft, tl)
+    md = exporters.markdown(pb, tl, lambda t: f"https://x/#/job/sample?t={int(t)}")
+    assert "Screen and voice disagree" in md and "Not settled yet" in md
+    assert "](https://x/#/job/sample?t=" in md
+    assert "screen vs voice" in exporters.mermaid(pb, tl)
+    s1 = next(s for s in pb.steps if s.id == "s1")
+    s1.confirmed, s1.resolution = True, "screen"
+    md = exporters.markdown(pb, tl)
+    assert "The expert followed the screen" in md and "Not settled yet" not in md
+    assert "screen vs voice" not in exporters.mermaid(pb, tl)
