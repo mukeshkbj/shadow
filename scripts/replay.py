@@ -25,6 +25,8 @@ ap.add_argument("--url", default=str(ROOT / "demo-prop" / "index.html"),
                 help="app to drive (default: the demo prop)")
 ap.add_argument("--headless", action="store_true")
 ap.add_argument("--auto", action="store_true", help="answer every expert prompt with 's' (skip)")
+ap.add_argument("--provider", default="muse", choices=["muse", "open"],
+                help="muse = Muse Spark 1.3 on the Meta Model API; open = Muse Spark Open on SHADOW_OPEN_BASE_URL")
 a = ap.parse_args()
 
 pb_path = Path(a.job)
@@ -39,7 +41,11 @@ except ImportError:
     sys.exit("pip install playwright && playwright install chromium")
 
 url = a.url if "://" in a.url else Path(a.url).resolve().as_uri()
-client = MuseClient(settings)
+if a.provider == "open":
+    from shadow.providers import OpenChatClient  # noqa: E402
+    client, model = OpenChatClient(settings), settings.open_model
+else:
+    client, model = MuseClient(settings), settings.locate_model
 
 def cli_ask(q: str) -> str:
     if a.auto:
@@ -54,7 +60,7 @@ with sync_playwright() as p:
     browser = p.chromium.launch(headless=a.headless)
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     page.goto(url)
-    log = run(client, page, pb, work, ask=cli_ask)
+    log = run(client, page, pb, work, ask=cli_ask, model=model)
     browser.close()
 
 n_ok = sum(1 for x in log["actions"] if x.get("ok"))

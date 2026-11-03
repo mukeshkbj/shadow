@@ -180,7 +180,7 @@ def run(client: MuseClient, page, pb: Playbook, work: Path,
     questions = {q.id: q for q in pb.open_questions}
     index_of = {s.id: i for i, s in enumerate(pb.steps)}
     notes: list[str] = []
-    log = {"title": pb.title, "actions": [], "asked": [], "stopped": ""}
+    log = {"title": pb.title, "model": model, "actions": [], "asked": [], "stopped": ""}
 
     i = 0
     while 0 <= i < len(pb.steps):

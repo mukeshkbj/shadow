@@ -526,7 +526,7 @@ function Replay({ id, steps, log }) {
     <div className="replay">
       <div className={`replay-head ${log.stopped ? "stopped" : "done"}`}>
         <strong>{log.stopped ? `Stopped and asked: ${log.stopped}` : "The agent did the job back"}</strong>
-        <span className="small">{nActions} actions · {nDecisions} decisions · {(log.asked || []).length} question{(log.asked || []).length === 1 ? "" : "s"} for the expert · Muse Spark reading the live page</span>
+        <span className="small">{nActions} actions · {nDecisions} decisions · {(log.asked || []).length} question{(log.asked || []).length === 1 ? "" : "s"} for the expert · {log.model && log.model.includes("open") ? "Muse Spark Open (open weights)" : "Muse Spark"} reading the live page</span>
       </div>
       <ol className="replay-steps">
         {groups.map((g, gi) => {

@@ -95,6 +95,22 @@ class OpenProvider:
         return self._chat([{"type": "text", "text": prompt}])
 
 
+class OpenChatClient:
+    """MuseClient-shaped adapter (respond_parts) over an OpenAI-compatible host, so Replay can run on Muse Spark Open."""
+
+    def __init__(self, s: Settings, transport: Optional[httpx.BaseTransport] = None):
+        self.p = OpenProvider(s, transport)
+
+    def respond_parts(self, model: str, content: list, **extra) -> tuple[str, dict]:
+        parts = []
+        for c in content:
+            if c.get("type") == "input_text":
+                parts.append({"type": "text", "text": c["text"]})
+            elif c.get("type") == "input_image":
+                parts.append({"type": "image_url", "image_url": {"url": c["image_url"]}})
+        return self.p._chat(parts), {}
+
+
 def get_provider(name: str, s: Settings) -> Provider:
     if name == "open":
         return OpenProvider(s)
