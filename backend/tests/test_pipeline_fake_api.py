@@ -151,7 +151,7 @@ def test_job_runs_end_to_end(tmp_path, monkeypatch):
     store = jobs.JobStore(s)
     with open(video, "rb") as f:
         job_id = store.create("in.mp4", f, "muse")
-    for _ in range(100):
+    for _ in range(400):  # up to 40 s: the job runs in a background thread
         st = store.status(job_id)
         if st["state"] != "running":
             break

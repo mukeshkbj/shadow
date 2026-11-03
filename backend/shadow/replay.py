@@ -17,6 +17,7 @@ from .muse import MuseClient, extract_json
 from .schemas import Playbook, Step
 
 Ask = Callable[[str], str]
+MAX_ACTIONS_PER_STEP = 3
 Progress = Callable[[str], None]
 
 SNAPSHOT_JS = """() => {
@@ -44,15 +45,21 @@ Rules the expert said aloud while recording:
 {rules}
 Expert notes from this run:
 {notes}
+Actions already taken for this step:
+{taken}
 Interactive elements currently on the page (JSON):
 {elements}
 
-Return JSON only, exactly one action:
+Return JSON only, exactly one next action:
 {{"action": "click" | "fill" | "select" | "check" | "none",
   "by": "css" | "text",
   "selector": "<css selector, or visible text when by=text>",
   "value": "<text to type, or option label for select>",
+  "done": true | false,
   "why": "<one line>"}}
+
+A step can need several actions (e.g. type an order number, then click Search). Set "done": true
+when this action completes the step; false if another action is still needed after it.
 
 - click: click an element. by="css" uses a selector like #issue; by="text" matches visible text like "Alex Morgan".
 - fill: clear the field and type the value.
@@ -104,8 +111,9 @@ def _shot_b64(page) -> Optional[str]:
 
 
 def _propose(client: MuseClient, model: str, step: Step, elements: list,
-             rules: list[str], notes: list[str], shot: Optional[str]) -> dict:
+             rules: list[str], notes: list[str], shot: Optional[str], taken: Optional[list] = None) -> dict:
     prompt = ACTION.format(
+        taken="\n".join(f"- {t}" for t in (taken or [])) or "(none yet)",
         text=step.text,
         detail_line=f"Detail: {step.detail}\n" if step.detail else "",
         rules="\n".join(f"- {r}" for r in rules) or "(none)",
@@ -231,18 +239,33 @@ def run(client: MuseClient, page, pb: Playbook, work: Path,
             i += 1
             continue
 
-        act = _propose(client, model, step, elements, rules, notes, shot)
-        ok, err = _execute(page, act)
-        entry = {"step": step.id, "text": step.text, "action": act.get("action"),
-                 "selector": act.get("selector"), "value": act.get("value"),
-                 "why": act.get("why"), "ok": ok}
+        # A step may need a few actions (fill, then click). Re-read the page between them.
+        taken: list[str] = []
+        failed = False
+        for _ in range(MAX_ACTIONS_PER_STEP):
+            act = _propose(client, model, step, elements, rules, notes, shot, taken)
+            ok, err = _execute(page, act)
+            entry = {"step": step.id, "text": step.text, "action": act.get("action"),
+                     "selector": act.get("selector"), "value": act.get("value"),
+                     "why": act.get("why"), "ok": ok}
+            if not ok:
+                entry["error"] = err
+                log["actions"].append(entry)
+                failed = True
+                break
+            log["actions"].append(entry)
+            progress(f"step {n}: {act.get('action')} {act.get('selector') or ''} — {str(act.get('why', ''))[:60]}")
+            taken.append(f"{act.get('action')} {act.get('selector') or ''} {act.get('value') or ''}".strip())
+            if act.get("done", True) or act.get("action") in ("check", "none", None):
+                break
+            elements = _snapshot(page)
+            shot = _shot_b64(page)
+        after = _shot_b64(page)   # what the screen looks like once the step is done
         try:
-            (shots_dir / f"step_{n:02d}.png").write_bytes(base64.b64decode((shot or "").split(",", 1)[-1] or "iVBORw0KGgo="))
+            (shots_dir / f"step_{n:02d}.png").write_bytes(base64.b64decode((after or shot or "").split(",", 1)[-1] or "iVBORw0KGgo="))
         except Exception:
             pass
-        if not ok:
-            entry["error"] = err
-            log["actions"].append(entry)
+        if failed:
             ans = ask(f"Step {n} failed (“{step.text}”): {err}\nType a hint, or Enter to stop:")
             log["asked"].append({"step": step.id, "question": "action failed", "answer": ans})
             if not ans.strip():
@@ -250,8 +273,6 @@ def run(client: MuseClient, page, pb: Playbook, work: Path,
                 break
             notes.append(f"On step {n} the expert hinted: {ans.strip()}")
             continue
-        log["actions"].append(entry)
-        progress(f"step {n}: {act.get('action')} {act.get('selector') or ''} — {act.get('why', '')[:60]}")
         i += 1
 
     (work / "replay_log.json").write_text(json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8")

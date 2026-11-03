@@ -12,12 +12,27 @@ function useHash() {
 }
 const go = (h) => { window.location.hash = h; };
 
-const Logo = () => (
-  <a href="#/" className="logo">
-    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill="#12151B" /><circle cx="17.5" cy="14" r="7" fill="#C2410C" /></svg>
+const Logo = ({ light = false }) => (
+  <a href="#/" className={`logo ${light ? "logo-light" : ""}`}>
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill={light ? "#FFFFFF" : "#12151B"} /><circle cx="17.5" cy="14" r="7" fill="#C2410C" /></svg>
     <span>Shadow</span>
   </a>
 );
+
+const kindOf = (s) => (s.source === "inferred" && s.confirmed ? "confirmed" : s.source);
+
+function StageRail({ active, done = [] }) {
+  const stages = [["record", "Record"], ["verify", "Verify"], ["replay", "Replay"]];
+  return (
+    <ol className="stages-rail" aria-label="Shadow stages">
+      {stages.map(([k, l], i) => (
+        <li key={k} className={`rail-step ${active === k ? "on" : ""} ${done.includes(k) ? "done" : ""}`}>
+          <span className="rail-dot" aria-hidden="true">{done.includes(k) ? "✓" : i + 1}</span>{l}
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 const SOURCE_LABEL = { seen: "Seen", said: "Said", inferred: "Inferred" };
 function Badge({ step }) {
@@ -53,8 +68,8 @@ function Home() {
   const send = async (file) => {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".mp4")) { setErr("Please choose an MP4 file."); return; }
-    setBusy(true); setErr("");
     if (health?.passcode_required && !passcode.trim()) { setErr("Enter the upload passcode first."); return; }
+    setBusy(true); setErr("");
     try {
       const { id } = await api.upload(file, provider, passcode);
       try { localStorage.setItem("shadow-passcode", passcode); } catch {}
@@ -62,17 +77,55 @@ function Home() {
     }
     catch (e) { setErr(e.message); setBusy(false); }
   };
+  const demo = jobs.find(j => !j.sample && j.state === "done") || jobs.find(j => j.state === "done");
 
   return (
     <div className="page">
-      <header className="bar"><Logo /></header>
-      <main className="narrow stack-lg">
+      <section className="hero">
+        <header className="hero-bar">
+          <Logo light />
+          <nav className="row hero-nav" aria-label="Main">
+            <a href="#how">How it works</a>
+            <a href="https://github.com/mukeshkbj/shadow" target="_blank" rel="noreferrer">GitHub</a>
+          </nav>
+        </header>
+        <div className="hero-body">
+          <div className="hero-grid">
+          <div className="hero-copy">
+          <span className="hero-eyebrow mono">Built with Muse Spark · Muse Wonder · Voice Transcribe · SAM 3.1</span>
+          <h1 className="hero-title">Show it once.</h1>
+          <p className="hero-lede">Shadow watches an expert do a task, writes the playbook, <em>proves every step</em> against the recording, then does the job back — and stops wherever you never showed it.</p>
+          <div className="row hero-cta">
+            {demo && <a className="btn btn-accent btn-lg" href={`#/job/${demo.id}`}>Open the live demo</a>}
+            <a className="btn btn-ghost btn-lg" href="#upload">Upload a recording</a>
+          </div>
+          </div>
+          <a className="hero-shot" href={demo ? `#/job/${demo.id}` : "#upload"} aria-label="Open the live demo">
+            <img src="/hero-review.jpg" alt="Shadow's review screen: the recording, an evidence timeline with screen, voice and step lanes, and the cited steps" />
+          </a>
+          </div>
+          <ol className="loop" id="how">
+            {[["01", "Record", "Do the task once, talking as you go. One screen recording with sound.", ["Muse Spark 1.2 watches + listens", "Voice Transcribe times every line"]],
+              ["02", "Verify", "Every step cites the second it came from: Seen, Said or Inferred. Gaps become questions, never guesses.", ["Muse Wonder drafts", "Evidence check in plain code", "Spark + SAM 3.1 point at fields"]],
+              ["03", "Replay", "An agent does the job back in the real app — and asks you at anything you never showed it.", ["Muse Spark agent on the live page"]]].map(([n, t, d, chips]) => (
+              <li key={n} className="loop-card">
+                <span className="mono loop-n">{n}</span>
+                <strong className="loop-title">{t}</strong>
+                <span className="loop-desc">{d}</span>
+                <span className="loop-chips">{chips.map(c => <span key={c} className="model-chip">{c}</span>)}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <main className="narrow stack-lg" id="upload">
         <div className="stack-sm">
-          <h1 className="h1">Show Shadow how the job is done</h1>
-          <p className="lede">Record your screen while you do the task, and talk as you go. Shadow turns it into a playbook you can check: every step tied to the moment it came from, every assumption flagged.</p>
+          <h2 className="h1 h1-sm">Show Shadow how the job is done</h2>
+          <p className="lede">Record your screen while you do the task and say why you do things. Use test data if the real thing is sensitive.</p>
         </div>
         {health && !health.providers?.length && (
-          <div className="notice">No model is configured, so new recordings can't be processed yet. The sample playbook below works offline. Set <code>MODEL_API_KEY</code> and restart the server.</div>
+          <div className="notice">No model is configured, so new recordings can't be processed yet. The playbooks below still open. Set <code>MODEL_API_KEY</code> and restart the server.</div>
         )}
         {health?.providers?.length > 0 && (
           <fieldset className="engine">
@@ -103,25 +156,18 @@ function Home() {
             <label className="btn btn-dark">{busy ? "Uploading…" : "Choose a file"}
               <input type="file" accept="video/mp4" className="sr-only" disabled={busy} onChange={e => send(e.target.files[0])} />
             </label>
-            <a className="btn" href="#/job/sample">Open the sample playbook</a>
           </div>
           {err && <p className="error" role="alert">{err}</p>}
         </div>
-        <div className="grid3">
-          {[["01", "Do the task for real", "One case, start to finish. Use test data if the real thing is sensitive."],
-            ["02", "Say why, not just what", "“Over 30 days is store credit only.” Rules like that are what Shadow listens for."],
-            ["03", "Don't worry about gaps", "Anything you don't show comes back as a question, not a guess."]].map(([n, t, d]) => (
-            <div className="card stack-xs" key={n}><span className="mono accent">{n}</span><strong>{t}</strong><span className="muted small">{d}</span></div>
-          ))}
-        </div>
         <section className="stack-sm">
-          <h2 className="h2">Your playbooks</h2>
+          <h2 className="h2">Playbooks</h2>
           <div className="card flush">
             {jobs.length === 0 && <div className="pad muted">Nothing yet.</div>}
             {jobs.map(j => (
               <a key={j.id} className="job-row" href={j.state === "done" ? `#/job/${j.id}` : `#/job/${j.id}/processing`}>
-                <strong className="grow">{j.title || j.filename}</strong>
-                {j.counts && <span className="muted small">{j.counts.seen + j.counts.said + j.counts.inferred} steps · {j.counts.to_confirm} to confirm · {j.counts.open_questions} open questions</span>}
+                <span className="stack-0 grow"><strong>{j.title || j.filename}</strong>
+                  <span className="muted small">{j.sample ? "Offline sample (no model calls)" : `Real run on the Meta Model API · ${j.filename}`}</span></span>
+                {j.counts && <span className="muted small">{j.counts.seen + j.counts.said + j.counts.inferred} steps · {j.counts.to_confirm} to confirm · {j.counts.open_questions} questions</span>}
                 <span className={`pill pill-${j.state}`}>{j.state === "done" ? (j.counts && (j.counts.to_confirm || j.counts.open_questions) ? "In review" : "Ready") : j.state === "error" ? "Failed" : "Processing"}</span>
               </a>
             ))}
@@ -183,9 +229,83 @@ function Processing({ id }) {
 }
 
 /* ---------------- Review ---------------- */
+function TrustBar({ pb }) {
+  const steps = pb.steps;
+  const counts = { seen: 0, said: 0, confirmed: 0, inferred: 0 };
+  steps.forEach(s => { counts[kindOf(s)] += 1; });
+  const backed = counts.seen + counts.said + counts.confirmed;
+  const openQ = pb.counts.open_questions;
+  return (
+    <div className="trust" aria-label="Evidence summary">
+      <div className="trust-bar" aria-hidden="true">
+        {steps.map(s => <span key={s.id} className={`trust-seg seg-${kindOf(s)}`} />)}
+      </div>
+      <span className="trust-text"><strong>{backed} of {steps.length}</strong> steps backed by the recording
+        {counts.inferred > 0 && <> · <b className="warn">{counts.inferred} need{counts.inferred === 1 ? "s" : ""} you</b></>}
+        {openQ > 0 && <> · <b className="accent">{openQ} open question{openQ === 1 ? "" : "s"}</b></>}
+      </span>
+    </div>
+  );
+}
+
+function EvidenceTimeline({ duration, events, turns, steps, sel, now, onSeek, onPick }) {
+  const D = duration || 1;
+  const pct = t => `${Math.min(100, Math.max(0, (t / D) * 100))}%`;
+  const seekFrom = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    onSeek(Math.max(0, Math.min(D, ((e.clientX - r.left) / r.width) * D)));
+  };
+  const ticks = []; for (let t = 0; t <= D; t += D > 150 ? 30 : 10) ticks.push(t);
+  return (
+    <div className="tl" aria-label="Evidence timeline">
+      <div className="tl-row tl-ruler"><span className="tl-label" />
+        <div className="tl-track">{ticks.map(t => <span key={t} className="tl-tick mono" style={{ left: pct(t) }}>{ts(t)}</span>)}</div></div>
+      <div className="tl-row"><span className="tl-label">Screen</span>
+        <div className="tl-track tl-click" onClick={seekFrom} title="What Muse Spark saw on screen">
+          {events.filter(e => e.source === "seen").map(e => <span key={e.id} className="tl-dot" style={{ left: pct(e.t) }} title={`${ts(e.t)} · ${e.action}`} />)}
+        </div></div>
+      <div className="tl-row"><span className="tl-label">Voice</span>
+        <div className="tl-track tl-click" onClick={seekFrom} title="Narration turns from Muse Voice Transcribe">
+          {turns.map((u, i) => <span key={i} className={`tl-turn ${now >= u.start && now <= u.end ? "on" : ""}`} style={{ left: pct(u.start), width: pct(Math.max(0.6, u.end - u.start)) }} title={`${ts(u.start)} · “${u.text}”`} />)}
+        </div></div>
+      <div className="tl-row"><span className="tl-label">Steps</span>
+        <div className="tl-track">
+          {steps.map((s, i) => {
+            const end = s.t_end != null && s.t_end > s.t_start ? s.t_end : (steps[i + 1]?.t_start ?? Math.min(D, s.t_start + 6));
+            return <button key={s.id} className={`tl-step seg-${kindOf(s)} ${i === sel ? "on" : ""}`} style={{ left: pct(s.t_start), width: pct(Math.max(1.5, end - s.t_start)) }}
+                           onClick={() => onPick(i)} title={`Step ${i + 1} · ${s.text}`}>{i + 1}</button>;
+          })}
+        </div></div>
+      <div className="tl-playhead-wrap" aria-hidden="true"><span className="tl-playhead" style={{ left: pct(now) }} /></div>
+    </div>
+  );
+}
+
+function Provenance({ step, events }) {
+  const byId = Object.fromEntries(events.map(e => [e.id, e]));
+  const cited = (step.evidence_event_ids || []).map(id => byId[id]).filter(Boolean);
+  const seen = cited.filter(e => e.source === "seen");
+  const items = [];
+  if (seen.length) items.push(["spark", "Muse Spark 1.2", `saw it on screen at ${seen.map(e => ts(e.t)).join(", ")}`]);
+  if (step.quote_check) items.push(["voice", "Voice Transcribe", `heard the quote at ${ts(step.quote_check.start)}–${ts(step.quote_check.end)}`]);
+  else if (step.source === "said") items.push(["voice", "Muse Spark 1.2", "heard it in the narration"]);
+  items.push(["wonder", "Muse Wonder", "wrote the step from the timeline"]);
+  if (step.downgraded_reason) items.push(["check warn", "Evidence check", step.downgraded_reason]);
+  else items.push(["check", "Evidence check", step.source === "inferred" ? "kept it as an interpretation" : "found matching evidence"]);
+  if (step.pointer) items.push(["sam", "Spark + SAM 3.1", `outlined “${step.pointer.label || step.field}”`]);
+  if (step.confirmed) items.push(["expert", "Expert", "confirmed it"]);
+  return (
+    <ul className="prov" aria-label="Where this step came from">
+      {items.map(([k, who, what], i) => <li key={i} className={`prov-item prov-${k}`}><b>{who}</b> {what}</li>)}
+    </ul>
+  );
+}
+
 function Review({ id }) {
   const [pb, setPb] = useState(null);
+  const [tl, setTl] = useState({ events: [], turns: [], duration: 0 });
   const [job, setJob] = useState(null);
+  const [replay, setReplay] = useState(undefined);
   const [err, setErr] = useState("");
   const [sel, setSel] = useState(0);
   const [tab, setTab] = useState("steps");
@@ -195,6 +315,8 @@ function Review({ id }) {
   useEffect(() => {
     api.playbook(id).then(setPb).catch(e => setErr(e.message));
     api.job(id).then(setJob).catch(() => {});
+    api.timeline(id).then(t => setTl({ events: t.events || [], turns: t.turns || [], duration: t.duration || 0 })).catch(() => {});
+    api.replay(id).then(setReplay).catch(() => setReplay(null));
   }, [id]);
 
   if (err) return <div className="page"><header className="bar"><Logo /></header><main className="narrow"><p className="error">{err}</p></main></div>;
@@ -203,11 +325,12 @@ function Review({ id }) {
   const steps = pb.steps;
   const cur = steps[sel] || steps[0];
   const c = pb.counts;
-  const pick = (i) => {
-    setSel(i);
-    if (video.current && steps[i]) { video.current.currentTime = steps[i].t_start; }
-  };
+  const duration = pb.duration || tl.duration;
+  const seek = (t) => { setNow(t); if (video.current) video.current.currentTime = t; };
+  const pick = (i) => { setSel(i); if (steps[i]) seek(steps[i].t_start); };
   const update = (p) => p.then(setPb).catch(e => setErr(e.message));
+  const saying = tl.turns.find(u => now >= u.start - 0.2 && now <= u.end + 0.2);
+  const replayDone = replay && !replay.stopped && replay.actions?.length > 0;
 
   return (
     <div className="page">
@@ -215,18 +338,12 @@ function Review({ id }) {
         <div className="row">
           <Logo />
           <span className="divider" />
-          <div className="stack-0"><strong>{pb.title}</strong><span className="muted small">{job?.sample ? "Sample · synthetic data · " : ""}{ts(pb.duration)} recording{job?.provider === "open" ? " · run on open weights (Muse Spark Open)" : ""}</span></div>
+          <div className="stack-0"><strong>{pb.title}</strong><span className="muted small">{job?.sample ? "Offline sample · " : "Real run · Meta Model API · "}{ts(duration)} recording{job?.provider === "open" ? " · open weights (Muse Spark Open)" : ""}</span></div>
         </div>
-        <div className="row">
-          <div className="legend small">
-            <span><i className="key key-seen" />{c.seen} seen</span>
-            <span><i className="key key-said" />{c.said} said</span>
-            <span><i className="key key-inferred" />{c.to_confirm} to confirm</span>
-            <span><b className="accent">?</b> {c.open_questions} open questions</span>
-          </div>
-          <a className="btn btn-dark" href={`#/job/${id}/export`}>Export playbook</a>
-        </div>
+        <StageRail active={tab === "replay" ? "replay" : "verify"} done={["record", ...(replayDone ? ["replay"] : [])]} />
+        <a className="btn btn-dark" href={`#/job/${id}/export`}>Export playbook</a>
       </header>
+      <TrustBar pb={pb} />
 
       <main className="split">
         <section className="col-main stack-md" aria-label="Recording">
@@ -244,48 +361,47 @@ function Review({ id }) {
                   <div className="pointer" aria-hidden="true" style={{
                     left: `${(cur.pointer.x1 / cur.pointer.w) * 100}%`, top: `${(cur.pointer.y1 / cur.pointer.h) * 100}%`,
                     width: `${((cur.pointer.x2 - cur.pointer.x1) / cur.pointer.w) * 100}%`, height: `${((cur.pointer.y2 - cur.pointer.y1) / cur.pointer.h) * 100}%`,
-                  }}><span>Pointer</span></div>
+                  }}><span>{cur.pointer.label || "Pointer"}</span></div>
                 )}
               </div>
             ) : (
               <div className="player-empty">
-                <strong>No recording attached to the sample</strong>
-                <span>Record take A from <code>demo-prop/RECORDING.md</code> and save it as <code>backend/fixtures/sample.mp4</code> to see the video here.</span>
+                <strong>The offline sample has no video</strong>
+                <span>Open the real run from the home page to see the recording, pointers and timeline in action.</span>
               </div>
             )}
-            <div className="track" aria-hidden="true">
-              <div className="track-fill" style={{ width: `${(cur.t_start / (pb.duration || 1)) * 100}%` }} />
-              {steps.map((s, i) => <span key={s.id} className={`tick tick-${s.source}`} style={{ left: `${(s.t_start / (pb.duration || 1)) * 100}%` }} />)}
-            </div>
+            <EvidenceTimeline duration={duration} events={tl.events} turns={tl.turns} steps={steps} sel={sel} now={now} onSeek={seek} onPick={pick} />
+            <div className="saying" aria-live="polite">{saying ? <><span className="mono">{ts(saying.start)}</span> “{saying.text}”</> : <span className="muted">Narration appears here as the video plays</span>}</div>
           </div>
 
-          <div className="card stack-sm">
+          <div className="card evidence stack-sm">
             <div className="row">
-              <span className="eyebrow">Evidence for step {sel + 1}</span>
+              <span className="eyebrow">Step {sel + 1} · evidence</span>
               <span className="mono chip">{ts(cur.t_start)}{cur.t_end != null ? `–${ts(cur.t_end)}` : ""}</span>
               <Badge step={cur} />
             </div>
+            <h3 className="evidence-title">{cur.text}</h3>
             <p className="m0">{cur.evidence || "—"}</p>
             {cur.quote && <blockquote className="quote">“{cur.quote}”</blockquote>}
-            {cur.quote_check && <p className="m0 small ok">✓ Matches the narration transcript at {ts(cur.quote_check.start)}–{ts(cur.quote_check.end)} (Muse Voice Transcribe)</p>}
-            {cur.downgraded_reason && <p className="m0 small warn"><strong>Evidence check:</strong> {cur.downgraded_reason} So this step is marked inferred.</p>}
-            {cur.field && <p className="m0 small muted">On screen: <strong>{cur.field}</strong>{cur.pointer ? " (outlined on the video by SAM 3.1 as a pointer)" : ""}. The timestamped recording is the evidence.</p>}
+            <Provenance step={cur} events={tl.events} />
+            <p className="m0 xsmall muted">Pointers and model notes help you look. The timestamped recording is the evidence.</p>
           </div>
         </section>
 
         <section className="col-side card flush" aria-label="Playbook">
           <div role="tablist" aria-label="Playbook views" className="tabs">
-            {[["steps", "Steps"], ["flow", "Flow"], ["questions", `Open questions · ${c.open_questions}`], ["replay", "Replay"]].map(([k, l]) => (
-              <button key={k} role="tab" aria-selected={tab === k} className={`tab ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>{l}</button>
+            {[["steps", `Steps · ${steps.length}`], ["flow", "Flow"], ["questions", `Questions · ${c.open_questions}`], ["replay", "Replay"]].map(([k, l]) => (
+              <button key={k} role="tab" aria-selected={tab === k} className={`tab ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>{l}{k === "replay" && replayDone && <span className="tab-dot" />}</button>
             ))}
           </div>
           {tab === "steps" && (
             <ol className="steps">
               {steps.map((s, i) => (
-                <li key={s.id} className={`step ${i === sel ? "on" : ""}`}>
+                <li key={s.id} className={`step step-${kindOf(s)} ${i === sel ? "on" : ""}`}>
                   <button className="step-main" onClick={() => pick(i)}>
-                    <span className="stack-0 step-time"><span className="mono">{ts(s.t_start)}</span><span className="muted xsmall">Step {i + 1}</span></span>
-                    <span className="stack-0 grow"><strong>{s.text}</strong><span className="muted small">{s.detail}</span></span>
+                    <span className="step-node" aria-hidden="true">{i + 1}</span>
+                    <span className="stack-0 grow"><strong>{s.text}</strong><span className="muted small">{s.detail}</span>
+                      <span className="mono xsmall muted">{ts(s.t_start)}{s.kind === "decision" ? " · decision" : ""}</span></span>
                     <Badge step={s} />
                   </button>
                   {s.source === "inferred" && !s.confirmed && <StepReview s={s} onConfirm={() => update(api.editStep(id, s.id, { confirmed: true }))} onFix={(text) => update(api.editStep(id, s.id, { text }))} />}
@@ -296,7 +412,7 @@ function Review({ id }) {
           )}
           {tab === "flow" && <Flow pb={pb} onPick={(sid) => { const i = steps.findIndex(s => s.id === sid); if (i >= 0) { pick(i); setTab("steps"); } }} />}
           {tab === "questions" && <Questions pb={pb} onAnswer={(qid, a) => update(api.answer(id, qid, a))} />}
-          {tab === "replay" && <Replay id={id} steps={steps} />}
+          {tab === "replay" && <Replay id={id} steps={steps} log={replay} />}
           {pb.notes?.length > 0 && tab === "steps" && (
             <details className="notes small"><summary>Evidence check log ({pb.notes.length})</summary><ul>{pb.notes.map((n, i) => <li key={i}>{n}</li>)}</ul></details>
           )}
@@ -387,51 +503,63 @@ function Question({ q, onAnswer }) {
   );
 }
 
-function Replay({ id, steps }) {
-  const [log, setLog] = useState(undefined);
-  useEffect(() => { setLog(undefined); api.replay(id).then(setLog).catch(() => setLog(null)); }, [id]);
+function Replay({ id, steps, log }) {
+  const [open, setOpen] = useState(null);
   if (log === undefined) return <div className="pad muted">Loading…</div>;
   if (!log) return (
     <div className="pad stack-xs muted">
-      <strong>No replay for this job yet.</strong>
-      <span>After confirming the playbook, run <code>python scripts/replay.py {id}</code>. The agent re-runs it in the app it came from, and stops to ask at anything unconfirmed or unshown.</span>
+      <strong>No replay for this playbook yet.</strong>
+      <span>After confirming the playbook, run <code>python scripts/replay.py {id}</code>. An agent re-runs it in the app it came from, and stops to ask at anything unconfirmed or unshown.</span>
     </div>
   );
   const indexOf = Object.fromEntries(steps.map((s, i) => [s.id, i + 1]));
+  const groups = [];
+  log.actions.forEach(x => {
+    const last = groups[groups.length - 1];
+    if (last && last.step === x.step) last.items.push(x); else groups.push({ step: x.step, items: [x] });
+  });
+  const askedBy = {}; (log.asked || []).forEach(a => { (askedBy[a.step] = askedBy[a.step] || []).push(a); });
+  const nActions = log.actions.filter(x => x.ok && x.action && !["none", "check"].includes(x.action)).length;
+  const nDecisions = log.actions.filter(x => x.decision).length;
   return (
-    <div className="pad stack-md">
-      {log.stopped && <div className="notice small">Stopped: {log.stopped}</div>}
-      {log.actions.map((x, i) => {
-        const shot = indexOf[x.step] ? api.replayShotUrl(id, `step_${String(indexOf[x.step]).padStart(2, "0")}.png`) : null;
-        return (
-          <div key={i} className="stack-xs" style={{ borderBottom: "1px solid var(--line)", paddingBottom: 12 }}>
-            <div className="row" style={{ gap: 10, alignItems: "baseline" }}>
-              <span className="mono xsmall muted">{x.step}</span>
-              <span className="grow">
-                {x.decision ? <>Decision — {x.decision} → <b>{x.chose}</b></>
-                  : x.skipped ? <span className="muted"><s>{x.text}</s> skipped</span>
-                  : <b>{x.text}</b>}
-                {(x.error || x.why) && <span className="muted small"> — {x.error || x.why}</span>}
-              </span>
-              <span className={`pill ${x.ok === false ? "pill-error" : x.skipped ? "" : "pill-done"}`}>
-                {x.skipped ? "skipped" : x.decision ? "decision" : x.ok === false ? "failed" : "done"}
-              </span>
-            </div>
-            {x.action && !["none", "check"].includes(x.action) &&
-              <span className="mono xsmall muted">{x.action} {x.selector}{x.value ? ` = ${x.value}` : ""}</span>}
-            {shot && <img src={shot} alt="" onError={e => e.currentTarget.remove()}
-                          style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid var(--line)" }} />}
-          </div>
-        );
-      })}
-      {log.asked?.length > 0 && (
-        <div className="stack-xs">
-          <strong className="small">Asked the expert</strong>
-          {log.asked.map((a, i) => (
-            <div key={i} className="small muted"><span className="accent">?</span> {a.question} → {a.answer || "(stopped here)"}</div>
-          ))}
-        </div>
-      )}
+    <div className="replay">
+      <div className={`replay-head ${log.stopped ? "stopped" : "done"}`}>
+        <strong>{log.stopped ? `Stopped and asked: ${log.stopped}` : "The agent did the job back"}</strong>
+        <span className="small">{nActions} actions · {nDecisions} decisions · {(log.asked || []).length} question{(log.asked || []).length === 1 ? "" : "s"} for the expert · Muse Spark reading the live page</span>
+      </div>
+      <ol className="replay-steps">
+        {groups.map((g, gi) => {
+          const n = indexOf[g.step];
+          const shot = n ? api.replayShotUrl(id, `step_${String(n).padStart(2, "0")}.png`) : null;
+          return (
+            <li key={gi} className="replay-step">
+              <span className="step-node" aria-hidden="true">{n || "·"}</span>
+              <div className="stack-xs grow">
+                <strong>{steps[n - 1]?.text || g.step}</strong>
+                {(askedBy[g.step] || []).map((a, k) => (
+                  <div key={k} className="replay-ask"><b>Asked the expert</b> {a.question === "unconfirmed step" ? "this step was never confirmed — run it anyway?" : a.question} <span className="muted">→ {a.answer?.trim() ? a.answer : "go ahead"}</span></div>
+                ))}
+                {g.items.map((x, k) => x.decision ? (
+                  <div key={k} className="replay-act"><span className="act-kind act-decide">decide</span>{x.decision} → <b>{x.chose}</b><span className="muted small"> · {x.why}</span></div>
+                ) : x.skipped ? (
+                  <div key={k} className="replay-act muted"><span className="act-kind">skip</span>skipped at the expert's request</div>
+                ) : (
+                  <div key={k} className={`replay-act ${x.ok === false ? "bad" : ""}`}>
+                    <span className="act-kind">{x.action || "—"}</span>
+                    <span className="mono xsmall">{x.selector}{x.value ? ` = “${x.value}”` : ""}</span>
+                    <span className="muted small"> {x.error || x.why}</span>
+                  </div>
+                ))}
+                {shot && (
+                  <button className="replay-shot" onClick={() => setOpen(open === gi ? null : gi)} aria-expanded={open === gi}>
+                    <img src={shot} alt={`Screen after step ${n}`} className={open === gi ? "big" : ""} onError={e => e.currentTarget.parentElement.remove()} />
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
