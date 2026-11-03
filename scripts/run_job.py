@@ -52,7 +52,11 @@ def stage(name, out, fn):
         sys.exit(0)
 
 def do_timeline():
-    tl = passes.build_timeline(prov, video, d, settings, log)
+    turns = None
+    if not getattr(prov, "hears_audio", True) and meta:
+        turns = transcribe.narration_turns(meta, video, d, settings.transcribe_model)
+        log(f"{prov.name} can't hear audio: giving it {len(turns or [])} transcribed narration turns as text")
+    tl = passes.build_timeline(prov, video, d, settings, log, turns=turns)
     (d / "timeline_raw.json").write_text(tl.model_dump_json(indent=2), encoding="utf-8")
 
 def do_transcribe():

@@ -25,6 +25,13 @@ Rules:
 - Do not invent events you did not see or hear. Fewer, accurate events are better.
 """
 
+NARRATION_NOTE = """
+You can see this clip but not hear it. Here is its narration, transcribed by a separate speech model, with times
+in seconds from the start of this clip. Treat it as exactly what was said: log each rule, reason or intention as a
+"said" event at the time given, with the words in "quote", and put the full narration in "transcript".
+{lines}
+"""
+
 WINDOW_NOTE = "This clip is a {length:.0f}-second window; use times relative to the start of this clip (0 to {length:.0f})."
 
 PLAYBOOK = """You are turning a timestamped log of a screen recording into a step-by-step playbook that an expert will REVIEW.

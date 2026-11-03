@@ -124,7 +124,7 @@ def test_open_weights_provider_sends_video_and_audio_parts(tmp_path):
         reply = TIMELINE_REPLY(len(seen)) if "LOG WHAT HAPPENED" in text else PLAYBOOK_REPLY
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(reply)}}]})
 
-    s = replace(Settings(), open_base_url="https://example.test/v1", open_api_key="k", window_seconds=0)
+    s = replace(Settings(), open_base_url="https://example.test/v1", open_api_key="k", window_seconds=0, open_audio=True)
     prov = providers.OpenProvider(s, transport=httpx.MockTransport(handler))
     tl = passes.build_timeline(prov, video, tmp_path, s, lambda m: None)
     assert seen[0] == ["text", "video_url", "audio_url"]           # audio sent separately

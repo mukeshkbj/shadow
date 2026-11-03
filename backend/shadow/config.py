@@ -46,6 +46,9 @@ class Settings:
     open_api_key: str = field(default_factory=lambda: os.environ.get("SHADOW_OPEN_API_KEY", ""))
     open_model: str = field(default_factory=lambda: os.environ.get("SHADOW_OPEN_MODEL", "meta-models/muse-spark-open"))
     open_window_seconds: int = field(default_factory=lambda: _int("SHADOW_OPEN_WINDOW_SECONDS", 30))
+    # Most hosts accept video but not audio (Nebius rejects audio parts). When off, the narration is
+    # transcribed by Muse Voice Transcribe and given to the open model as text, with its times.
+    open_audio: bool = field(default_factory=lambda: os.environ.get("SHADOW_OPEN_AUDIO", "0") == "1")
     transcribe_model: str = field(default_factory=lambda: os.environ.get("SHADOW_TRANSCRIBE_MODEL", "muse-voice-transcribe-1.0"))
     locate_model: str = field(default_factory=lambda: os.environ.get("SHADOW_LOCATE_MODEL", "muse-spark-1.3"))
     sam_model: str = field(default_factory=lambda: os.environ.get("SHADOW_SAM_MODEL", "sam-3.1"))

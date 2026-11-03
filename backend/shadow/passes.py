@@ -47,7 +47,7 @@ def _json_with_retry(call, prompt: str, raw_path: Path):
         return extract_json(text)
 
 
-def build_timeline(provider, video: Path, work: Path, s: Settings, progress: Progress) -> Timeline:
+def build_timeline(provider, video: Path, work: Path, s: Settings, progress: Progress, turns=None) -> Timeline:
     total = media.duration(video)
     window = s.window_seconds
     if provider.needs_windows:
@@ -66,6 +66,10 @@ def build_timeline(provider, video: Path, work: Path, s: Settings, progress: Pro
         length = min(window, total - offset) if len(clips) > 1 else total
         note = prompts.WINDOW_NOTE.format(length=length) if len(clips) > 1 else ""
         prompt = prompts.TIMELINE.format(window_note=note)
+        if turns and not getattr(provider, "hears_audio", True):
+            heard = [t for t in turns if t.end > offset and t.start < offset + length]
+            lines = "\n".join(f"[{max(t.start - offset, 0):.1f}s] {t.text}" for t in heard) or "(no narration in this clip)"
+            prompt += prompts.NARRATION_NOTE.format(lines=lines)
         raw = _json_with_retry(lambda p: provider.watch(clip, p), prompt, work / f"pass1_raw_{n:03d}.txt")
         events += _events_from(raw, offset, length)
         if raw.get("transcript"):

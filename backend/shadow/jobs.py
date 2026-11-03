@@ -131,7 +131,14 @@ class JobStore:
             meta = MuseClient(self.s) if self.s.api_key else None
 
             self._set(job_id, stage="timeline", detail="watching and listening")
-            tl = passes.build_timeline(provider, video, d, self.s, lambda msg: self._set(job_id, detail=msg))
+            early_turns = None
+            if not getattr(provider, "hears_audio", True) and meta and self.s.use_transcribe:
+                self._set(job_id, detail="transcribing the narration for the open model")
+                try:
+                    early_turns = transcribe.narration_turns(meta, video, d, self.s.transcribe_model)
+                except Exception as e:
+                    notes.append(f"The open model can't hear audio and the transcript failed, so spoken rules may be missing ({str(e)[:120]}).")
+            tl = passes.build_timeline(provider, video, d, self.s, lambda msg: self._set(job_id, detail=msg), turns=early_turns)
 
             if meta and self.s.use_transcribe:
                 self._set(job_id, detail="transcribing the narration")

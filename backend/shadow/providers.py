@@ -31,6 +31,7 @@ class Provider(Protocol):
 class MuseProvider:
     name = "muse"
     needs_windows = False
+    hears_audio = True
 
     def __init__(self, s: Settings, transport: Optional[httpx.BaseTransport] = None):
         self.s = s
@@ -60,6 +61,7 @@ class OpenProvider:
         if not (s.open_base_url and s.open_api_key):
             raise MuseError("Open-weights mode needs SHADOW_OPEN_BASE_URL and SHADOW_OPEN_API_KEY")
         self.s = s
+        self.hears_audio = s.open_audio
         self.http = httpx.Client(base_url=s.open_base_url, transport=transport,
                                  headers={"Authorization": f"Bearer {s.open_api_key}"},
                                  timeout=httpx.Timeout(600, connect=30))
@@ -80,7 +82,7 @@ class OpenProvider:
 
     def watch(self, clip: Path, prompt: str) -> str:
         with tempfile.TemporaryDirectory() as tmp:
-            wav = media.extract_wav(clip, Path(tmp) / "audio.wav", rate=16000)
+            wav = media.extract_wav(clip, Path(tmp) / "audio.wav", rate=16000) if self.hears_audio else None
             content = [
                 {"type": "text", "text": prompt},
                 {"type": "video_url", "video_url": {"url": _data_url(clip, "video/mp4")}},
