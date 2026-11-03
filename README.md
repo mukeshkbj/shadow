@@ -93,6 +93,9 @@ Hosts take video but not audio (Nebius rejects audio parts), so Shadow does the 
 | On-screen actions (avg / worst) | **0.21 s** / 0.5 s, from 30-second windows |
 | Spoken lines | come from the transcript given to it as text (0.05 s avg after snapping), so this measures Voice Transcribe, not the open model |
 | Playbook | 6 steps (3 Seen, 2 Said, 1 Inferred), 2 decisions, 3 open questions; it flagged the same "oldest first" vs "Newest first" conflict |
+| Replay on Muse Spark Open | all 6 steps done in the demo shop (8 actions, 2 decisions), asked the expert once |
+
+**Replay runs on the open model too** (`python scripts/replay.py <job> --provider open`). A finding from testing it: when the expert answered the unconfirmed first step with a bare "run it anyway", the agent followed the *spoken* rule, re-sorted the inbox oldest-first and opened the wrong customer (Chris Lee, outside the 30-day window). When the expert typed the correction ("take the newest request"), it did the whole job correctly. That is the case for asking: the screen and the voice disagreed, and only the expert knew which one was right.
 
 ## Replay: the agent does the job back
 Once the expert has confirmed the playbook, Shadow can **re-run it** in the app it was recorded in.
