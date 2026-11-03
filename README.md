@@ -6,6 +6,7 @@
 
 - **Live:** https://mukeshkbj--shadow-web.us-east.modal.run. Open the featured run (a real run on the Meta Model API). Uploading a new recording needs a passcode, because each upload spends API credits.
 - **Demo video (3 min):** see the submission page.
+- **Open weights:** the same recording run through **Muse Spark Open** on Nebius is the second playbook on the live site (see [Open-weights mode](#open-weights-mode-muse-spark-open)).
 
 ![Every step cites its evidence](docs/evidence.jpg)
 
@@ -80,8 +81,18 @@ cd backend; python -m pytest -q
 ```
 Includes a full pipeline run against a fake Meta API with a generated video, which checks windowing, timestamp offsets and the evidence rules.
 
-## Open-weights mode
-Pick **Open weights** on the upload screen to run both passes on **Muse Spark Open** through any OpenAI-compatible host (Baseten, Fireworks, Modal). Hosts ignore the audio inside a video, so each 30-second window is sent as a video part plus a separate WAV audio part. Status: built and covered by tests against a fake host, but not yet run against a live host.
+## Open-weights mode (Muse Spark Open)
+Pick **Open weights** on the upload screen to run the watching and writing passes on **Muse Spark Open**, Meta's open-weight model, through any OpenAI-compatible host. The live app uses **Nebius Token Factory** (`meta-models/muse-spark-open`), paid from our own account.
+
+Hosts take video but not audio (Nebius rejects audio parts), so Shadow does the listening separately: **Muse Voice Transcribe** transcribes the narration first, and each 30-second video window goes to Muse Spark Open together with the narration lines for that window, with their times, as text. Voice Transcribe and SAM 3.1 still check quotes and draw pointers. Set `SHADOW_OPEN_AUDIO=1` for a host that does accept audio.
+
+**Featured open-weights run** (`refund-open` on the live site, same 85-second take):
+
+| What | Muse Spark Open on Nebius |
+|---|---|
+| On-screen actions (avg / worst) | **0.21 s** / 0.5 s, from 30-second windows |
+| Spoken lines | come from the transcript given to it as text (0.05 s avg after snapping), so this measures Voice Transcribe, not the open model |
+| Playbook | 6 steps (3 Seen, 2 Said, 1 Inferred), 2 decisions, 3 open questions; it flagged the same "oldest first" vs "Newest first" conflict |
 
 ## Replay: the agent does the job back
 Once the expert has confirmed the playbook, Shadow can **re-run it** in the app it was recorded in.
